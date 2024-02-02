@@ -7,6 +7,7 @@ header-includes:
 output:
   bookdown::word_document2:
     fig_caption: true
+    keep_md: true
 urlcolor: #6684c1
 bibliography: bib_bmjopen.bib
 link-citations: true
@@ -42,16 +43,16 @@ library(snf.datastory)
 # to address files
 library(here)
 # Avoid dependency on load order of packages
-library(conflicted)
+# library(conflicted)
 
 # conflict_prefers 
 # if you'd like to see futher updates, tell rhe.
-conflict_prefer("filter", "dplyr")
-conflict_prefer("select", "dplyr")
-conflict_prefer("here", "here")
-conflict_prefer("list", "base")
-conflict_prefer("as_image", "kableExtra")
-conflict_prefer("group_rows", "kableExtra")
+# conflict_prefer("filter", "dplyr")
+# conflict_prefer("select", "dplyr")
+# conflict_prefer("here", "here")
+# conflict_prefer("list", "base")
+# conflict_prefer("as_image", "kableExtra")
+# conflict_prefer("group_rows", "kableExtra")
 # More libraries
 library(cowplot)
 library(texreg)
@@ -65,6 +66,10 @@ library(tidyr)
 library(ggpubr)
 library(flextable)
 library(ftExtra)
+library(stringr)
+
+
+library(readxl)
 # windowsFonts("Source Sans" = windowsFont("Source Sans Pro Regular"))
 # change this to false if desired output is pdf
 is_word = TRUE
@@ -73,19 +78,36 @@ is_word = TRUE
 ```{r load-ls-data, cache = FALSE, echo = FALSE, results = 'hide'}
 
 # Load the data from Zenodo:
-library(readxl)
 url <- "https://zenodo.org/record/6676562/files/positive_words_frequencies.xlsx"
 destfile <- "positive_words_frequencies.xlsx"
-curl::curl_download(url, destfile)
+# curl::curl_download(url, destfile)
 
 career_freq_ls <-  read_xlsx(destfile, sheet = "career") %>% 
-  mutate(Number = 1:n())
+  mutate(Number = 1:n()) %>% 
+  mutate(ResearchInstitutionType = 
+           case_when(ResearchInstitutionType %in% 
+                       c("Other", "Other research institutes", 
+                         "Hospitals (non-university)",
+                         "University of applied sciences") ~ "UAS and Other",
+                     TRUE ~ ResearchInstitutionType))
 
 sparkabs_freq_ls <- read_xlsx(destfile, sheet = "spark") %>% 
-  mutate(Number = 1:n())
+  mutate(Number = 1:n()) %>% 
+  mutate(ResearchInstitutionType = 
+           case_when(ResearchInstitutionType %in% 
+                       c("Other", "Other research institutes", 
+                         "Hospitals (non-university)",
+                         "University of applied sciences") ~ "UAS and Other",
+                     TRUE ~ ResearchInstitutionType))
 
 pf_freq_ls <- read_xlsx(destfile, sheet = "projects") %>% 
-  mutate(Number = 1:n())
+  mutate(Number = 1:n()) %>% 
+  mutate(ResearchInstitutionType = 
+           case_when(ResearchInstitutionType %in% 
+                       c("Other", "Other research institutes", 
+                         "Hospitals (non-university)",
+                         "University of applied sciences") ~ "UAS and Other",
+                     TRUE ~ ResearchInstitutionType))
 
 # 25 positive words as suggested in Vinkers et al (2015)
 pos_words <- c(
@@ -121,7 +143,7 @@ pos_words <- c(
 
 ```{r load-function-etc, cache = FALSE, echo = FALSE, results = 'hide'}
 # Code to format tables and figures
-source(here::here("paper_draft", "r_functions.R"))
+source(here::here("r_functions.R"))
 ```
 
 
@@ -245,12 +267,12 @@ career_success <- career_freq_ls %>%
 
 ## ----plot specific words ----
 sparkabs_plot <-
-  plot_positivewords(word_prevalence = count_prevalence(sparkabs_freq_ls),
-                     pos_words = pos_words)
-pf_plot <- plot_positivewords(word_prevalence = count_prevalence(pf_freq_ls),
+  plot_positivewords(freq_word = sparkabs_freq_ls, 
+                     pos_words= pos_words)
+pf_plot <- plot_positivewords(freq_word = pf_freq_ls,
                               pos_words = pos_words)
 career_plot <-
-  plot_positivewords(word_prevalence = count_prevalence(career_freq_ls),
+  plot_positivewords(freq_word = career_freq_ls,
                      pos_words = pos_words)
 ```
 
@@ -281,101 +303,47 @@ career_reg_ls <- analyze_gender(dat =  career_freq_ls)
 
 ```
 
-```{r all calculations part 3, cache = FALSE, echo = FALSE, results = 'hide'}
-# analyze the effects of gender and language on grant
-#------------------------------------------------------------------
-# analysis: gender and language on grant
-#------------------------------------------------------------------
-# Analysis of the whether gender in interaction with the 'binary variable for
-# presence of positive words' or the 'sum of positive words' has an effect on
-# funding decisions
-
-# spark abstracts
-# ---------------
-sparkabs_grant_ls <- analyze_grant(dat = sparkabs_freq_ls)
-
-# pf abstracts
-# ---------------
-pf_grant_ls <- analyze_grant(dat = pf_freq_ls)
-
-# career abstracts
-# ---------------
-career_grant_ls <- analyze_grant(dat = career_freq_ls)
-
-
-```
-
-```{r extract-funded-ls}
-
-# Extract LS:
-sparkabs_freq_ls_fundable <- sparkabs_freq_ls %>% 
-  filter(IsFundable == 1)
-gender_spark_ls_fundable <- gender_spark %>% 
-  filter(IsFundable == 1)
-
-pf_freq_ls_approved <- pf_freq_ls %>% 
-  filter(IsApproved == 1) 
-gender_pf_ls_approved <- gender_pf %>% 
-  filter(IsApproved == 1)
-
-career_freq_ls_approved <- career_freq_ls %>% 
-  filter(IsApproved == 1)
-gender_career_ls_approved <- gender_career %>% 
-  filter(IsApproved == 1)
-
-spark_numbers_ls_fundable <- sparkabs_freq_ls_fundable %>% 
-  select(Number, sum_pos) %>%
-  mutate(is_positive = if_else(sum_pos>0,1,0)) %>%
-  group_by(is_positive) %>%
-  summarise(n_app= n(), .groups="drop")
-
-pf_numbers_ls_approved <- pf_freq_ls_approved %>% 
-  select(Number, sum_pos) %>%
-  mutate(is_positive = if_else(sum_pos>0,1,0)) %>%
-  group_by(is_positive) %>%
-  summarise(n_app= n(), .groups="drop")
-
-career_numbers_ls_approved <- career_freq_ls_approved %>% 
-  select(Number, sum_pos) %>%
-  mutate(is_positive = if_else(sum_pos>0,1,0)) %>%
-  group_by(is_positive) %>%
-  summarise(n_app= n(), .groups="drop")
-
-```
-
 
 
 # Abstract{-}
-**Objectives:** To investigate whether the use of positive, self-promotional language in grant proposals correlates with the gender of the applicant. Potential differences across different types of funding schemes are examined. This study is a replication and generalisation of analyses previously presented in @Lerchenmueller, which analysed positive language usage in published biomedical articles.  The setting of the current work is grant proposals submitted to the Swiss National Science Foundation (SNSF). 
+**Objectives:**To investigate whether the use of positive, self-promotional language in grant proposals correlates with the gender of the applicant. Different types of funding schemes are examined.
+
+**Setting:**  8,150 grant proposals submitted to the Swiss National Science Foundation (SNSF) in life sciences disciplines across three different funding schemes, targeting grant applicants at different career stages.
 
 **Design:** Cross-sectional analysis using multivariate, logistic, and Poisson regression models.
 
-**Results:** Unlike previous studies, no strong correlations between the use of self-promotional language and gender were identified. In Projects, the main funding scheme of the SNSF that funds independent bottom-up research, evidence that male applicants of successful proposals used on average a higher count of self-promotional words in their proposal abstracts than their successful female peers was found (Rate Ratio of 1.09; 95% CI 1.006 to 1.182). However, no evidence of a gender difference was found in the other funding schemes analysed.  Further, no evidence for a difference in the use of self-promotional words between the genders was found when considering all submitted proposals instead of only successful proposals.
+**Participants:** Grant proposals, including demographic data about their applicants. 
 
-**Conclusion(s):** We see it as an encouraging result that self-promotional language does not play an outsized role in the funding of good research. The use of positive words does not seem to be an explanatory factor in the differences of research funding awarded to male and female grant applicants.
+**Primary outcome measure:** Count and binary presence of positive words, as identified in previous work analysing positive language usage in published biomedical articles, in grant proposal abstracts. 
+
+**Results:** No strong evidence of an association between the use of self-promotional language and gender were identified in grant proposals from life sciences disciplines. In the Projects funding scheme that funds independent bottom-up research, male applicants have used on average slightly more positive words in their proposal abstracts than their female peers, but the estimates (Rate Ratio of 1.044; 95% CI 0.987 to 1.104) show no evidence of an effect. Similarly, no evidence of gender differences was found in proposals from the Careers funding schemes (Rate Ratio of 1.077, 95% CI 0.992–1.17) which target early career researchers, and in Spark (Rate Ratio of 1.093, 95% CI 0.953–1.254), a double-blind funding scheme supporting unconventional research. 
+
+**Conclusion(s):** The goal of this study is to examine whether there is a difference in positive language usage between male and female grant applicants. It is encouraging that there is no strong evidence indicating a difference in the use of positive words between male and female grant applicants. Although many factors influence how peer reviewers perceive the content of research grant proposals, language usage undoubtedly plays an important role. We urge other funding agencies to conduct similar studies to identify if language usage contributes to biases in grant evaluation. 
+
+
+**Strengths and Limitations**
+
+* This study is an extension of previous work examining published biomedical articles, and is here applied to the new setting of grant proposals. To our knowledge, this is the first study of this type examining research grant proposals, and includes a large sample of both funded and rejected research grant proposals. 
+
+* This study investigates the counts of positive words used in grant proposals through Poisson regression models, a method not previously applied in this setting.
+
+* This study does not assess whether the use of self-promotional language contributes to grant funding success. 
+
+* This study investigated the presence of 25 terms previously found to be associated with self-promotional language. Many other dimensions of language usage may influence how readers perceive the content of research grant proposals, but this is beyond the scope of the current work. 
 
 
 # Introduction
 
-The “leaky pipeline” of female researchers leaving academic careers is well-established (@Goulden2011, @Moss-Racusin2012, @Lundine2018). Although the percentage of female researchers at earlier career stages is growing, there are still markedly fewer independent female researchers than their male peers, and the percentage of female researchers in leadership positions is still small. If female researchers are receiving fewer research grants than their male peers, this will limit their career advancement. It is therefore important for research funding agencies to investigate whether their funding practices are encouraging or hindering the careers of the researchers they fund.
+Bias against female grant applicants has been observed across research funding agencies. A study from the Swiss National Science Foundation found that both male and female peer reviewers graded female applicants more harshly than male applicants, even when potentially confounding factors were taken into consideration (@Severin2020). In the US, a text analysis by the National Institutes of Health found that peer reviewers used different language to describe male and female grant applicants, where male applicants were more likely to be described as leaders (@Magua2017). The Canadian Institutes of Health Research found that male applicants were more likely to receive funding than female applicants, but that this was because female applicants were evaluated less favorably as principal investigators, not because of any difference in the quality of their proposals (@Witteman2019). Evidence of bias in the evaluation of track records of female applicants was also found in the Netherlands (@Van_der_Lee2015). The current study aims to determine if the language used by the applicants themselves in their abstracts might be a contributing factor in the differing treatment of grant proposals from male and female principal investigators. 
 
-Bias against female grant applicants has been observed across research funding agencies. A study from the Swiss National Science Foundation found that both male and female peer reviewers graded female applicants more harshly than male applicants, even when potentially confounding factors were taken into consideration (@Severin2020). In the US, a text analysis by the National Institutes of Health found that peer reviewers used different language to describe male and female grant applicants, where male applicants were more likely to be described as leaders (@Magua2017). The Canadian Institutes of Health Research found that male applicants were more likely to receive funding than female applicants, but that this was because female applicants were evaluated less favorably as principal investigators, not because of any difference in the quality of their proposals (@Witteman2019). Evidence of bias in the evaluation of track records of female applicants was also found in the Netherlands (@Van_der_Lee2015). The current study aims to determine if the language used by the applicants themselves in their abstracts is contributing to the different treatment of grant proposals from male and female principal investigators.
+It is well-established that scientists often over-inflate the importance of their work in order to get published or funded (@Ioannidis2014, @Chiu2017). There is evidence that men use more self-promotional language than women when describing their own work histories (@Reuben2014). In particular, female authors of medical and life sciences articles were previously observed to use strongly positive language less frequently to describe their research than their male counterparts (@Lerchenmueller).  @Lerchenmueller used a list of 25 positive words established by @Vinkers2015 who selected them after manual analysis of biomedical texts from PubMed. @Vinkers2015 observed a significant increase in the use of these words across all PubMed literature over a 40-year period, and concluded that this is likely due to the positive-outcome bias in scientific publishing - that only research with the most unprecedented positive results will be published. This list was developed specifically for studying biomedical texts, and preliminary analyses have suggested that the usage of these words differs somewhat in other research areas.  
 
-It is well-established that scientists often over-inflate the importance of their work in order to get published or funded (@Ioannidis2014, @Chiu2017). There is evidence that men use more self-promotional language than women when describing their own work histories (@Reuben2014). In this analysis we investigate whether there is a gender difference in the use of self-promotional language in grant proposals.
+The current study builds on this study by @Lerchenmueller, replicating and extending their analyses to understand if their findings can also be observed in the context of research grant proposals. We analyse proposals submitted to three different funding schemes at the Swiss National Science Foundation, where the importance of the track record of the applicant varies considerably. We hypothesize that whether an applicant must present themselves as an established and successful researcher, as opposed to just promoting a single project idea, may influence how they describe their research. Since writing styles can differ substantially between academic disciplines (@Hyland2006) and the list of positive words was developed for biomedical texts, we will limit our analysis to grant proposals coming from the broad domain of life sciences. 
+This study provides insight into the use of self-promotional language in research grant proposals. The results should be of broad interest to the international scientific community, as Swiss scientific research is very competitive internationally. In fact, over half of the Swiss-based researchers included in this study originated from countries outside Switzerland (based on their current citizenship). This analysis is also important as a replication attempt of a notable result in the literature. 
 
-Female authors of medical and life sciences articles were previously observed to use strongly positive language less frequently to describe their research than their male counterparts (@Lerchenmueller). This work is a replication of the Lerchenmueller study, applying and extending the same techniques to understand if their results can also be observed in the context of research grant proposals. We analyse proposals submitted to three different funding schemes at the Swiss National Science Foundation, where the importance of the track record of the applicant varies considerably. We hypothesize that whether an applicant must present themselves as a whole package, as opposed to just promoting a single project idea, may influence how they describe their research. 
+# Methods
 
-We do not investigate whether the use of positive language influences the eventual funding of the grant proposal in this work. Such an analysis necessitates further considerations, such as adjusting for a wide variety of confounding variables, that are beyond the scope of this study. The SNSF has published in-depth analyses of its own funding decisions elsewhere (@snsf).
-
-In @Vinkers2015 the authors established a list of 25 positive words that they selected after manual analysis of biomedical texts from PubMed. They observed a significant increase in the use of these words across all PubMed literature over a 40-year period, and concluded that this is likely due to the positive-outcome bias in scientific publishing - that only research with the most unprecedented positive results will be published. We use these same words as the basis for our study. This list was developed specifically for studying biomedical texts, and preliminary analyses have suggested that the usage of these words differs somewhat in other research areas.  Writing styles can differ substantially between academic disciplines (@Hyland2006), as can grading cultures. For these reasons, we will limit our replication study to grant proposals coming from the broad domain of life sciences.
-
-We acknowledge that this study searches for the presence of these specific words, and does not perform any analysis of the context of the text surrounding the words. Random checks confirmed that the words are used as expected the vast majority of the time, but there are undoubtedly some instances where authors describe their own work using positive words in the negative, such as “not creative”.
-
-The results of this study should be of broad interest to the international scientific community, as Swiss scientific research is very competitive internationally. In fact, over 51% of the Swiss-based researchers included in this study originated from countries outside Switzerland (based on their current citizenship). This analysis is also important as a replication study of an important result in the literature.  
-
-# Data and Methods
-
-## Data
+## Data: grant proposals
 
 ```{r summary-statistics}
 
@@ -417,12 +385,6 @@ tab_gender <- pf_freq_ls %>%
                 select(n_perc_spark))
 
 tab_inst <- pf_freq_ls %>% 
-  mutate(ResearchInstitutionType = 
-           case_when(ResearchInstitutionType %in% 
-                       c("Other", "Other research institutes", 
-                         "Hospitals (non-university)",
-                         "University of applied sciences") ~ "UAS and Other",
-                     TRUE ~ ResearchInstitutionType)) %>% 
   group_by(ResearchInstitutionType) %>% 
   count() %>% 
   ungroup() %>% 
@@ -431,13 +393,7 @@ tab_inst <- pf_freq_ls %>%
                          " (", round(perc, 1), "%)")) %>% 
   rename(variable = ResearchInstitutionType) %>% 
   select(variable, n_perc) %>% 
-  bind_cols(career_freq_ls %>% 
-              mutate(ResearchInstitutionType = 
-                       case_when(ResearchInstitutionType %in% 
-                                   c("Other", "Other research institutes", 
-                                     "Hospitals (non-university)",
-                                     "University of applied sciences") ~ "UAS and Other",
-                                 TRUE ~ ResearchInstitutionType)) %>% 
+  bind_cols(career_freq_ls %>%  
               group_by(ResearchInstitutionType) %>% 
               count() %>% 
               ungroup() %>% 
@@ -446,12 +402,6 @@ tab_inst <- pf_freq_ls %>%
                                          " (", round(perc, 1), "%)")) %>% 
               select(n_perc_car)) %>% 
   bind_cols(sparkabs_freq_ls %>% 
-              mutate(ResearchInstitutionType = 
-                       case_when(ResearchInstitutionType %in% 
-                                   c("Other", "Other research institutes", 
-                                     "Hospitals (non-university)",
-                                     "University of applied sciences") ~ "UAS and Other",
-                                 TRUE ~ ResearchInstitutionType)) %>% 
               group_by(ResearchInstitutionType) %>% 
               count() %>% 
               ungroup() %>% 
@@ -548,13 +498,14 @@ tab_sum_pos <- pf_freq_ls %>%
               select(n_perc_spark))
 ```
 
-The data comes from research grant proposals to the Swiss National Science Foundation (SNSF) in the ten years between 2011 and 2020, and one shorter funding scheme. This study looks at the titles and abstracts from three different funding schemes, and investigates whether any of the 25 positive words identified by @Vinkers2015 appear in these texts, and if so, how frequently. Only English-language proposals are considered, which means that 0.3% of the available Career proposals and of the available Career proposals and 0.3% of the Project proposals had to be removed before processing.
 
-As part of the proposal submission process, applicants identify their own gender, so we are able to know with certainty the gender of each applicant. This differs from the Lerchenmueller study (@Lerchenmueller), where they had to make educated guesses about the gender of the authors based on their names. For the purposes of this study, we only consider the corresponding applicant on each proposal, although one of the three funding schemes included (Projects) can also involve multiple co-applicants.
+The data comes from research grant proposals submitted to the Swiss National Science Foundation (SNSF) in life sciences disciplines in the ten years between 2011 and 2020, and one shorter funding scheme. This study looks at the titles and abstracts from three different funding schemes and investigates whether any of the 25 positive words identified by @Vinkers2015 appear in these texts, and if so, how frequently. Only English-language proposals are considered, which means that 0.3% of the available Career proposals and 0.3% of the Project proposals had to be removed before processing.  
 
-We investigate whether there is a correlation between the gender and the use of positive words in each funding scheme. Raw data about the number and distribution of proposals is provided in Figure \@ref(fig:summary-numbers) and Table \@ref(tab:tab1). 
+As part of the proposal submission process, applicants identify their own gender, so we can know with certainty the gender of each applicant. For the purposes of this study, we only consider the gender of the corresponding applicant on each proposal, although one of the three funding schemes included (Projects) can also involve multiple co-applicants.
 
-Researchers come from three types of research institutions: Cantonal universities are the 12 large public research universities; the ETH-Domain consists the Swiss Federal Institutes of Technology (two universities - ETHZ and EPFL - and four research institutions); and the Universities of Applied Sciences (UAS) focus on practice-oriented qualifications.
+We investigate whether there is an association between the gender and the use of positive words in each funding scheme. Grant proposals to the SNSF are classified into three research areas: 1) Social Sciences and Humanities, 2) Mathematics, Natural- and Engineering Sciences, and 3) Life Sciences. Because the list of positive terms considered was created for biomedical texts, and we do not knowit is uncertain how well this list generalizes to other domains, we include only life sciences proposals in this analysis. 
+
+Researchers apply from three types of research institutions: Cantonal universities are the 12 large public research universities in Switzerland; the ETH-Domain consists of the Swiss Federal Institutes of Technology (two universities - ETHZ and EPFL - and four research institutions); and the Universities of Applied Sciences (UAS) and other research institutes focused on practice-oriented qualifications.
 
 The three funding schemes included in this study are:
 
@@ -562,178 +513,42 @@ The three funding schemes included in this study are:
 <!-- 15,785  -->
 `r pf_freq_ls %>% nrow() %>% format(big.mark = "'")` proposals from Projects are included in this study, 
 <!-- 51.7 -->
-`r pf_numbers %>% mutate(perc = n_app/sum(n_app)) %>% filter(is_positive == 1) %>% pull(perc) %>% round(2) *100`% of which contain at least one of the positive words. 
+`r pf_numbers %>% mutate(perc = n_app/sum(n_app)) %>% filter(is_positive == 1) %>% pull(perc) %>% round(2) *100`% of which contain at least one of the positive words in their title or abstract. 
 
-**Careers** (Ambizione, Excellenza, Professorships): These funding schemes are meant to support early-career researchers to be able to lead independent projects. The target researchers are a couple years past the completion of their PhDs, and are aiming for, but do not yet have, permanent tenure-track professorships. The track record of these applicants is very important for the success of their proposals. 
+**Careers** (Ambizione, Excellenza, Professorships): These funding schemes are meant to support early-career researchers to be able to lead independent projects. The target researchers are a couple years past the completion of their PhDs, and are aiming for, but do not yet have, permanent tenure-track professorships. The track record of the applicants is very important for the success of their proposals. 
 <!-- 4,648  -->
 `r career_freq_ls %>% nrow() %>% format(big.mark = "'")`
 proposals from Careers are included in this study, 
 <!-- 55.1 -->
-`r career_numbers %>% mutate(perc = n_app/sum(n_app)) %>% filter(is_positive == 1) %>% pull(perc) %>% round(2) *100`% of which contain at least one of the positive words. Compared to the Projects instrument, the applicants to the career schemes are on average younger (`r tab_age %>% select(n_perc_car) %>% substr( 1, 4)` years). 
+`r career_numbers %>% mutate(perc = n_app/sum(n_app)) %>% filter(is_positive == 1) %>% pull(perc) %>% round(2) *100`% of which contain at least one of the positive words in their title or abstract. Compared to the Projects instrument, the applicants to the career schemes are on average younger (`r tab_age %>% select(n_perc_car) %>% substr( 1, 4)` years). 
 
-**Spark**: This is a pilot funding scheme that is meant to support rapid funding of unconventional ideas. There have only been two calls as of 2020, so this dataset is smaller than the other two. The evaluation procedure is double-blind, and so the track record of the applicant should be of no importance to the proposal. 
+**Spark**: This was launched as a pilot funding scheme that is meant to support rapid funding of unconventional ideas. The pilot consisted of two calls in 2020 and this dataset is smaller than the other two. The evaluation procedure is double-blind, and so the track record of the applicant should be of no importance to the proposal. 
 <!-- 1,532  -->
 `r sparkabs_freq_ls%>% nrow() %>% format(big.mark = "'")` proposals from Spark are included in this study, 
 <!-- 61.2  -->
-`r spark_numbers %>% mutate(perc = n_app/sum(n_app)) %>% filter(is_positive == 1) %>% pull(perc) %>% round(2) *100`% of which contain at least one of the positive words. Compared to the other two funding schemes, the applicants to Spark are employed at the Universities of Applied Sciences at a higher percentage `r  (tab_inst %>% filter(variable == "UAS and Other") %>% pull(n_perc_spark) %>% str_extract_all("\\([^()]*\\)|[^()]+"))[[1]][2]`.
-We note that the available funding was very different between the two Spark calls, so when we analyse successful proposals, we will consider "fundability" for Spark, rather than true funding success, in order to be able to use the same success criterion for both calls. The applicants were on averag `r tab_age %>% select(n_perc_spark) %>% substr( 1, 4)` years old.
+`r spark_numbers %>% mutate(perc = n_app/sum(n_app)) %>% filter(is_positive == 1) %>% pull(perc) %>% round(2) *100`% of which contain at least one of the positive words in their title or abstract. Compared to the other two funding schemes, the applicants to Spark are employed at the Universities of Applied Sciences at a higher percentage `r  (tab_inst %>% filter(variable == "UAS and Other") %>% pull(n_perc_spark) %>% str_extract_all("\\([^()]*\\)|[^()]+"))[[1]][2]`.
+<!-- We note that the available funding was very different between the two Spark calls, so when we analyse successful proposals, we will consider "fundability" for Spark, rather than true funding success, in order to be able to use the same success criterion for both calls.  -->
+The applicants were on average `r tab_age %>% select(n_perc_spark) %>% substr( 1, 4)` years old.
 
 
-```{r data and summary figures, cache = FALSE, echo = FALSE, results = 'hide'}
-# Spark 
-#-------
-fig_spark_numbers <- 
-  sparkabs_freq_ls %>%
-  ggplot(aes(x = ResponsibleApplicantGender, 
-             fill = ResponsibleApplicantGender)) + 
-  geom_bar(position = position_stack(reverse = TRUE)) +
-  scale_fill_manual(
-    values = get_datastory_scheme(),
-    name = "",
-    labels = c("Female", "Male")
-  ) +
-  ylim(0, 450) +
-  geom_text(size = 2.4, stat ='count', aes(label = ..count..), vjust = -0.5) +
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), 
-        axis.title.y = element_blank()) +
-  ggtitle(paste0("Spark: ", format(length(sparkabs_freq_ls$Number),
-                                   big.mark = ",")," proposals")) 
+## Data: Positive Words
 
-# Number of fundable proposals
-fig_spark_n_fundable <- gender_spark_ls_fundable %>%
-  filter(IsFundable == 1) %>% 
-  ggplot(aes(y = n, x = ResponsibleApplicantGender,
-             fill = ResponsibleApplicantGender)) +   
-  geom_bar(stat = 'identity') +
-  scale_fill_manual(
-    values =  get_datastory_scheme(),
-    name = "",
-    labels = c("Female", "Male")) +
-  geom_text(size = 2.4, aes(label = n, x = ResponsibleApplicantGender),
-            vjust = -0.5) +
-  ylim(0, 180) + 
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
-  ggtitle(paste0("Spark: ",
-                 format(nrow(sparkabs_freq_ls_fundable), big.mark = ","),
-                 " fundable proposals"))
+The positive words included in this study, as defined by @Vinkers2015 based on publications from PubMed, are: amazing, assuring, astonishing, bright, creative, encouraging, enormous, excellent, favorable/ favourable, groundbreaking, hopeful, innovative, inspiring, inventive, novel, phenomenal, prominent, promising, reassuring, remarkable, robust, spectacular, supportive, unique, and unprecedented.
+
+## Statistical analysis
+
+To determine whether the use of positive language is associated with the gender of the grant applicant, @Lerchenmueller used multivariate linear probability regressions to model the binary outcome of whether a positive word was used at least once. To replicate their results, we followed the same procedure. In addition, we perform a logistic regression to model the same binary outcome, as we view this type of model to be more suited to answer our research question.  In addition, we perform a Poisson regression to model the count of positive word, to see if one gender might use a higher number of positive words. For all models, the age of the applicant, the type of institution, and the length of the text are taken as covariates, with gender as the variable of interest. 
+The models are adjusted for age because we consider the applicant’s age to be a confounder. Age is a reasonable proxy for career stage, and it is understandable that researchers at different stages of their careers would construct texts differently. We additionally adjust for the institution type as a reasonable, but imperfect proxy for prestige. Depending on the reputation of the institutions, as well as the investment the institutions make in their individual grant writing services, the affiliated researchers may write more positively about their research (for example, see Figure \@ref(fig:fig-distribution-number-poswords-inst) in the Appendix). Additionally, the gender distributions at the different institution types varies considerably. The models are adjusted for the length of the texts, as longer text have higher likelihood of containing more positive words. Proposals to Projects, Careers and Spark are analysed in separate models. 
+
+We will determine the presence or absence of evidence of an effect based on effect estimates weith 95% confidence intervals, which address the size of an effect more directly than p-values (@Wasserstein2016).
+
+<!-- \pagebreak -->
 
 
-# Project funding
-#-----------------
-fig_pf_numbers <- pf_freq_ls %>% 
-  ggplot(aes(x = ResponsibleApplicantGender,
-             fill = ResponsibleApplicantGender)) +
-  geom_bar(position = position_stack(reverse = TRUE)) +
-  scale_fill_manual(
-    values =  get_datastory_scheme(),
-    name = "",
-    labels = c("Female", "Male")) +
-  ylim(0, 6500) +
-  geom_text(size=2.4, 
-    stat='count', aes(label=..count..), vjust=-0.5) +
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
-  ggtitle(paste0("Projects: ", format(length(pf_freq_ls$Number),
-                                      big.mark = ","), " proposals"))
+# Results
+## Summary Statistics
 
-# Number of funded proposals
-fig_pf_n_approved <- gender_pf %>% 
-  filter(IsApproved == 1) %>% 
-  ggplot(aes(y = n, x = ResponsibleApplicantGender,
-             fill = ResponsibleApplicantGender))+   
-  geom_bar(stat = 'identity') +
-  scale_fill_manual(
-    values = get_datastory_scheme(),
-    name = "",
-    labels = c("Female", "Male")) +
-  geom_text(
-    aes(label = n, x = ResponsibleApplicantGender),
-    vjust = -0.5, size =2.4) +
-  ylim(0, 2700) + 
-  get_datastory_theme() + 
-  theme(axis.title.x=element_blank(), axis.title.y=element_blank()) +
-  ggtitle(paste0("Projects: ",
-                 format(nrow(pf_freq_ls_approved), big.mark = ","),
-                 " approved proposals"))
-
-# Career
-#--------
-fig_career_numbers <-
-  career_freq_ls %>% 
-  ggplot(aes(x = ResponsibleApplicantGender,
-             fill = ResponsibleApplicantGender)) +
-  geom_bar(position = position_stack(reverse = TRUE)) +
-  scale_fill_manual(
-    values = get_datastory_scheme(),
-    name = "",
-    labels = c("female", "male")) +
-  ylim(0, 1800) +
-  geom_text(stat='count', aes(label = ..count..), vjust = -0.5, size = 2.4) +
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
-  ggtitle(paste0("Careers: ", format(length(career_freq_ls$Number),
-                                     big.mark = ",")," proposals"))
-
-# Number of funded proposals
-fig_career_n_approved <- gender_career %>% 
-  filter(IsApproved == 1) %>%
-  ggplot(aes(y = n, x = ResponsibleApplicantGender,
-             fill = ResponsibleApplicantGender))+   
-  geom_bar(stat = 'identity') +
-  scale_fill_manual(
-    values = get_datastory_scheme(),
-    name = "",
-    labels = c("female", "male")) +
-  geom_text(aes(label = n, x = ResponsibleApplicantGender),
-            vjust = -0.5, size =2.4) +
-  ylim(0, 230) + 
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
-  ggtitle(paste0("Careers: ",
-                 format(nrow(career_freq_ls_approved), big.mark = ","),
-                 " approved proposals"))
-
-```
-
-```{r summary-numbers, fig.width = 6,fig.height = 8, fig.cap = "The number of proposals in each funding scheme are shown in the first column by gender. The second column shows the number of funded (or fundable for Spark) proposals submitted by female and male applicants by funding scheme.", message = FALSE, warning = FALSE}
-
-fig_numbers <- cowplot::plot_grid(
-  (fig_pf_numbers + theme(legend.position = "none", 
-                          axis.text.x = element_blank())),
-  (fig_pf_n_approved + theme(legend.position = "none", 
-                             axis.text.x = element_blank())),
-  (fig_career_numbers + theme(legend.position = "none", 
-                              axis.text.x = element_blank())),
-  (fig_career_n_approved + theme(legend.position = "none", 
-                                 axis.text.x = element_blank())),
-  (fig_spark_numbers + theme(legend.position = "none", 
-                             axis.text.x = element_blank())),
-  (fig_spark_n_fundable + theme(legend.position = "none", 
-                                axis.text.x = element_blank())), nrow =3
-)
-
-
-title_numbers <- ggdraw() #+
-  # draw_label("Number of proposals and fundable or funded proposals in the Life Sciences",
-  #            fontface = "bold")
-
-grobs_numbers <- ggplotGrob(fig_spark_numbers)$grobs
-legend_numbers <-
-  grobs_numbers[[which(sapply(grobs_numbers, function(x)
-    x$name) == "guide-box")]]
-
-
-plot_grid(title_numbers,
-          fig_numbers,
-          legend_numbers,
-          ncol = 1,
-          rel_heights = c(0.1, 1, 0.05))
-```
-
-\pagebreak
-
+Raw data on the number and distribution of proposals submitted to the three investigated funding schemes in the Life Sciences is provided in Table \@ref(tab:tab1). 
 ```{r tab1, message = FALSE, warning = FALSE, cache = F, results = "asis"}
 tab1 <- tab_fi %>% 
   mutate(group = "Total") %>% 
@@ -755,7 +570,7 @@ tab1 <- tab_fi %>%
          "Spark" = n_perc_spark) %>% 
   as_grouped_data(groups = c("group")) %>% 
   as_flextable(hide_grouplabel = TRUE) %>% 
-  set_caption(caption = "Descriptive Statistics for the tree funding schemes (Projects, Careers and Spark): count and percentage for factor variables, mean, maximum and minimum for continuous variables.") %>% 
+  set_caption(caption = "Descriptive Statistics for the three funding schemes (Projects, Careers and Spark): count and percentage for factor variables, mean, maximum and minimum for continuous variables.") %>% 
   hline(i = c(2, 5, 9, 11, 13, 15)) %>% 
   bold(i = c(1, 3, 6, 10, 12, 14, 16)) %>% 
   bold(part = "header") %>% 
@@ -765,34 +580,37 @@ tab1 <- tab_fi %>%
 tab1 
 ```
 
-## Positive Words
 
-The positive words included in this study, as defined by @Vinkers2015 based on publications from PubMed, are: amazing, assuring, astonishing, bright, creative, encouraging, enormous, excellent, favorable/ favourable, groundbreaking, hopeful, innovative, inspiring, inventive, novel, phenomenal, prominent, promising, reassuring, remarkable, robust, spectacular, supportive, unique, and unprecedented.
+The percentage of grant proposal from the funding scheme Projects that include any of the positive words in their title or abstract per Call year and gender of the applicant is shown in Figure \@ref(fig:perc-one-poswords). We observe that the use of positive terms by male applicants has been increasing over time.
 
-<!-- In order to establish whether the list is also valid for other research areas, w -->
-The percentage of grant proposal abstracts from the funding scheme Projects that include any of these words in each year is presented in Figure \@ref(fig:perc-one-poswords).  We observe that the use of positive terms has been increasing over time, a result consistent with the findings in @Vinkers2015.
 
-<!-- We see that approximately the same percentage of proposals use these terms in both MINT and LS, and that their usage is increasing at a similar rate, and so we conclude that the words are used comparably in these two research areas. In SSH, however, the percentage of proposals that include any of these terms is about one third lower than in LS and MINT, and their use does not seem to be increasing as fast, if at all. It is clear that these words are used less frequently in SSH. However, since the words are still used consistently, we will include SSH proposals in our study, recognizing that the results in this research area may be less conclusive than in LS and MINT. -->
-
-```{r perc-one-poswords, fig.height = 5, fig.align = "center", fig.width = 5, fig.cap = "The percentage of proposals from Projects that include any of the defined positive words.", message = FALSE, warning = FALSE}
+```{r perc-one-poswords, fig.height = 5, fig.align = "center", fig.width=7, fig.cap = "The share of proposals from Projects that include at least one of the defined positive words in their title or abstract.", message = FALSE, warning = FALSE}
 pf_freq_ls %>% 
-  group_by(CallYear) %>% 
+  mutate(ResponsibleApplicantGender = 
+           case_when(ResponsibleApplicantGender == "f" ~ "Female applicants",
+                     ResponsibleApplicantGender == "m" ~ "Male applicants")) %>% 
+  group_by(ResponsibleApplicantGender, CallYear) %>% 
   count(test = sum_pos > 0) %>% 
   mutate(freq = n/sum(n)) %>% 
   filter(test) %>% 
-  ggplot(aes(x = as.factor(CallYear), y = freq)) +
-  geom_col(position = position_dodge(), fill = get_datastory_scheme()[3], 
-           color = "white") +
+  ggplot(aes(x = as.factor(CallYear), y = freq, 
+             fill = ResponsibleApplicantGender)) +
+  geom_col(position = position_dodge(), 
+           color = "white", alpha = .8) + 
+  scale_fill_manual(
+    values = get_datastory_scheme(),
+    name = "",
+    labels = c("Female", "Male")) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
                      limits=c(0, .7)) +
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), 
-        axis.title.y = element_blank()) +
-  ggtitle(paste0("Proposals with positive words per year")) 
+  labs(y = "Share of at least one positive word", x = "Call year") +
+  theme_minimal() + 
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype = "dashed"),
+        panel.grid.minor.y = element_line(linetype = "dashed")) 
 ```
 
-The distributions of the positive words across all three funding schemes are provided in Figure \@ref(fig:fig-specific-words) (included in the Appendix). Figure \@ref(fig:fig-distribution-number-poswords) shows the distribution of the number of positive words per funding scheme and gender of the corresponding applicant.
-
+The distributions of the positive words across all three funding schemes are provided in Figure \@ref(fig:fig-specific-words) (included in the Appendix). Figure \@ref(fig:fig-distribution-number-poswords) shows the distribution of the number of positive words per funding scheme and gender of the corresponding applicant. We see that the majority of proposals include at least one positive term in their title or abstract.
 
 ```{r fig-distribution-number-poswords, fig.align="center", fig.height = 8, fig.width = 6, fig.cap = "The distribution of the number of positive words used in the abstracts of the different funding schemes by gender of the corresponding applicant. All counts larger than 7 are regrouped into 7+.", message = FALSE, warning = FALSE}
 
@@ -807,16 +625,21 @@ p_pf <- pf_freq_ls %>%
   mutate(freq = n/sum(n)) %>% 
   ggplot(aes(x = sum_pos, y = freq, color = ResponsibleApplicantGender,
              fill = ResponsibleApplicantGender)) +
-  geom_col(position = position_dodge(), color = "white") +
+  geom_col(position = position_dodge(), color = "white", alpha = 0.8) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
                      limits=c(0, .5)) +
   scale_fill_manual(
     values = get_datastory_scheme(),
     name = "",
     labels = c("Female", "Male")) +
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), 
-        axis.title.y = element_blank()) +
+  theme_minimal() + 
+  labs(x = "Number of positive words", 
+       y = "Share") +
+  theme(legend.position = "bottom", 
+        axis.title.x = element_blank(), 
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype = "dashed"),
+        panel.grid.minor.y = element_line(linetype = "dashed")) +
   ggtitle(paste0("Projects")) 
 
 p_careers <- career_freq_ls %>% 
@@ -830,16 +653,20 @@ p_careers <- career_freq_ls %>%
   mutate(freq = n/sum(n)) %>% 
   ggplot(aes(x = sum_pos, y = freq, color = ResponsibleApplicantGender,
              fill = ResponsibleApplicantGender)) +
-  geom_col(position = position_dodge(), color = "white") +
+  geom_col(position = position_dodge(), color = "white", alpha = 0.8) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
                      limits=c(0, .5)) +
   scale_fill_manual(
     values = get_datastory_scheme(),
     name = "",
     labels = c("Female", "Male")) +
-  get_datastory_theme() + 
+  theme_minimal() + 
+  labs(x = "Number of positive words", 
+       y = "Share") +
   theme(axis.title.x = element_blank(), 
-        axis.title.y = element_blank()) +
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype = "dashed"),
+        panel.grid.minor.y = element_line(linetype = "dashed")) +
   ggtitle(paste0("Careers")) 
 
 p_spark <- sparkabs_freq_ls %>% 
@@ -853,16 +680,19 @@ p_spark <- sparkabs_freq_ls %>%
   mutate(freq = n/sum(n)) %>% 
   ggplot(aes(x = sum_pos, y = freq, color = ResponsibleApplicantGender,
              fill = ResponsibleApplicantGender)) +
-  geom_col(position = position_dodge(), color = "white") +
+  geom_col(position = position_dodge(), color = "white", alpha = 0.8) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
                      limits=c(0, .5)) +
   scale_fill_manual(
     values = get_datastory_scheme(),
     name = "",
     labels = c("Female", "Male")) +
-  get_datastory_theme() + 
-  theme(axis.title.x = element_blank(), 
-        axis.title.y = element_blank()) +
+  theme_minimal() + 
+  labs(x = "Number of positive words", 
+       y = "Share") +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype = "dashed"),
+        panel.grid.minor.y = element_line(linetype = "dashed")) +
   ggtitle(paste0("Spark")) 
 
 p <- cowplot::plot_grid(p_pf + theme(legend.position = "none"), 
@@ -870,48 +700,25 @@ p <- cowplot::plot_grid(p_pf + theme(legend.position = "none"),
                         p_spark + theme(legend.position = "none"),
                         ncol = 1)
                         
-title <- ggdraw() +
-  draw_label("Distribution of the number of positve words by gender",
-             fontface = "bold")
 
 grobs <- ggplotGrob(p_pf)$grobs
 legend <-
   grobs[[which(sapply(grobs, function(x)
     x$name) == "guide-box")]]
 
-plot_grid(title,
-          p,
+plot_grid(p,
           legend,
           ncol = 1,
-          rel_heights = c(0.1, 1, 0.05))
+          rel_heights = c(1, 0.05))
 ```
 
-## Statistical Methods
 
-To determine whether the use of positive language correlates with the gender of the grant applicant @Lerchenmueller used multivariate linear probability regressions to model the binary outcome of whether a positive word was used at least once. In an attempt to replicate their results, we followed the same procedure. In addition, we perform a logistic regression to model the same binary outcome, as we view this type of model to be more suited to answer our research question. We then 
-<!-- , we use logistic regression to model the binary outcome of whether a positive word was used at least once. This differs from @Lerchenmueller, where multivariate linear probability models were used. We further  -->
-perform a Poisson regression to model the count of positive words in addition to simply their presence, to see if one gender might use a higher number of positive words. For all models, 
-the age of the applicant, the type of institution, and the length of the text are taken as covariates, with gender as the variable of interest. 
-The models are adjusted for age because we consider the applicant’s age to be a confounder. Age is a reasonable proxy for career stage, and it is understandable that researchers at different stages of their careers would construct texts differently. We additionally adjust for the institution type as a proxy for prestige. Depending on the reputation of the institutions, as well as the investment the institutions make in their individual grant writing services, the affiliated researchers may write more positively about their research (for example, see Figure \@ref(fig:fig-distribution-number-poswords-inst) in the Appendix). Additionally, the gender distributions at the different institution types varies considerably. The models are also adjusted for the length of the texts, as longer text have higher likelihood of containing more positive words.
+## Statistical analysis of grant proposals 
 
-<!-- In all cases, we stratify the proposal texts by research area within each funding scheme, as writing and grading cultures differ across research areas, and we would like to observe and quantify these differences. -->
-<!-- We use the three research areas as defined at the SNSF: life sciences (LS), mathematics, informatics, natural sciences and technology (MINT), and social sciences and humanities (SSH).  -->
-Note that we will determine the presence or absence of evidence of an effect based on 95% confidence intervals, which address the size of an effect more directly than p-values (@Wasserstein2016).
+We present results of the regression models relating the gender of the applicant to the use of positive language. 
 
-We first perform the analysis on all proposals to Projects, Careers and Spark. In a second step, we repeat the analysis but apply the models only to successful proposals.  The dataset of this second analysis is more similar to the original study of @Lerchenmueller which analyzed only published articles.  We note that the success of a grant proposal depends on many factors in addition to writing style, and so the current study does not allow us to make any conclusions about the influence of the writing on the success of a proposal. We leave such an extended analysis, including many other confounding variables, to future work.
-
-
-<!-- \pagebreak -->
-
-# Results
-
-We present the results of our models relating the gender of the applicant to the use of positive language.
-
-## Analysis of all proposals
-
-Table \@ref(tab:tab-gender-linear-stratify) shows the results of the multivariate linear probability model adjusted for age (in years), the institution type and the length of the texts. Evidence for a gender effect on the presence of a positive word cannot be found in any of the models for the different funding scheme. Unsurprisingly, the length of the text increases the chance of a positive word significantly (e.g. positive coefficient with 95%CI not including zero). Additionally, we find evidence for an effect of the institution type in proposals to Projects: compared to researchers from cantonal universities, researchers affiliated to the ETH Domain have a higher probability of using at least one positive word when describing their research projects. 
-
-\pagebreak
+Coefficient tables for the multivariate linear probability model and from the logistic regression model, both modeling the binary outcome “at least one positive word”, can be found in the appendix (tables \@ref(tab:tab-gender-linear-stratify) and \@ref(tab:tab-gender-binary-stratify)). 
+In these models, the only estimates suggesting evidence for an effect was found to be the length of the texts, i.e., positive coefficient with 95% CI not including zero. In Projects only, researchers affiliated to the ETH Domain were found to have a higher probability of using at least one positive word when describing their research projects. No evidence for a gender effect on the presence of at least one positive word is found in any of the binary outcome models.
 
 ```{r tab-gender-linear-stratify, message = FALSE, warning = FALSE, cache = F, results = "asis"}
 # list of covariates to be reported
@@ -921,23 +728,29 @@ reg_gender_linear_ls <- list(pf = pf_reg_ls$linear,
                              career = career_reg_ls$linear ,
                              spark = sparkabs_reg_ls$linear)
 
-ls_column_linear <- lapply(reg_gender_linear_ls,
-                           FUN = tabulate_lm_ci,  
-                           covariate_list = covariate_list,
-                           is_word = is_word) %>% simplify()
+tabulate_lm_ci <- function(m, digits = 3){
+  e <- summary(m)$coef[, "Estimate"]
+  sd <- summary(m)$coef[, "Std. Error"]
+  paste0(round(e, digits), " (", round(e - 1.96*sd, digits),
+         "--", round(e + 1.96*sd, digits), ")") %>% 
+    return()
+}
 
-var_column <- rep(c("gender - male", "age (years)",
+ls_column_linear <- lapply(reg_gender_linear_ls,
+                           FUN = tabulate_lm_ci) %>% unlist()
+
+var_column <- rep(c("Intercept", "gender - male", "age (years)",
                     "inst. type - ETH Domain", 
                     "inst. type - UAS and Other",
                     "text length (per 100 words)"), 3)
 
 FI_column <- c(
   rep(paste0("Projects: ", format(nrow(pf_reg_ls$linear$model), big.mark = "'"),
-             " observations"), 5),
+             " observations"), 6),
   rep(paste0("Careers: ", format(nrow(career_reg_ls$linear$model),
-                                 big.mark = "'"), " observations"), 5), 
+                                 big.mark = "'"), " observations"), 6), 
   rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$linear$model),
-                               big.mark = "'"), " observations"), 5))
+                               big.mark = "'"), " observations"), 6))
 
 tab_linear <- data.frame(FI_column,
                          var_column, ls_column_linear,
@@ -948,29 +761,19 @@ tab_linear_print <- tab_linear %>%
   as_grouped_data(groups = "FI_column") %>%
   as_flextable(hide_grouplabel = TRUE,
                col_keys = c("var_column",
-                            "ls_column_linear"))%>%
-  colformat_md(j = c(3)) %>%
+                            "ls_column_linear")) %>%
+  colformat_md(j = c(2)) %>%
   set_header_labels(var_column = " ",
                     ls_column_linear = "Coefficient Estimate (95% CI)") %>%
   bold(bold = TRUE, part = c("header")) %>%
   set_caption(caption = "Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from zero.")%>%
   width(width = 3) %>% 
-  hline(i = c(6, 12)) %>% 
-  bold(i = c(1, 7, 13))
+  hline(i = c(7, 14)) %>% 
+  bold(i = c(1, 8, 15))
 
 tab_linear_print 
 ```
 
-In a second model, Table \@ref(tab:tab-gender-binary-stratify) shows the odds ratios from the logistic regression, modelling the binary outcome “at least one positive word”, for all three data sources. A gender OR (male vs. female) larger than 1 suggests that male researchers are more likely to use at least one positive word compared to female researchers (used as the reference). We again do not see any evidence for gender differences in language usage in any of the funding schemes. The results are indeed very similar to the linear probability model which is reassuring.
-<!-- Gender differences appear in both Projects and Spark, but only in SSH. In Projects, the SSH odds ratio is 1.234, meaning that male applicants were 1.234 times likelier to use a positive word than their female peers, while in Spark, the odds ratio of 0.675 means that male applicants were only 0.675 times as likely as their female peers to use a positive word. Interestingly, in Projects, male SSH applicants are more likely to use at least one positive word, while in Spark it was the female applicants who were more likely to use at least one positive word. -->
-
-
-```{r ci pf binary}
-## ----pf binary stratify----
-pf_binary_ci_ls <- calculate_ci(
-  summary(pf_reg_ls$log)$coefficients["ResponsibleApplicantGenderm", ])
-
-```
 
 ```{r tab-gender-binary-stratify, message = FALSE, warning = FALSE, cache = F, results = "asis"}
 # list of covariates to be reported
@@ -980,23 +783,28 @@ reg_gender_binary_ls <- list(pf = pf_reg_ls$log,
                              career = career_reg_ls$log ,
                              spark = sparkabs_reg_ls$log)
 
-ls_column <- lapply(reg_gender_binary_ls,
-                    FUN = tabulate_ci,  
-                    covariate_list = covariate_list,
-                    is_word = is_word) %>% simplify()
+tabulate_ci <- function(m, digits = 3){
+  v <- cbind(exp(m$coefficients), exp(confint(m))) 
+  paste0(round(v[ ,1], digits), " (", round(v[ , 2], digits), "--",
+         round(v[ ,3], digits), ")") %>% 
+    return()
+}
 
-var_column <- rep(c("gender - male", "age (years)",
+ls_column <- lapply(reg_gender_binary_ls,
+                    FUN = tabulate_ci) %>% unlist()
+
+var_column <- rep(c("Intercept", "gender - male", "age (years)",
                     "inst. type - ETH Domain", 
                     "inst. type - UAS and Other",
                     "text length (per 100 words)"), 3)
 
 FI_column <- c(
   rep(paste0("Projects: ", format(nrow(pf_reg_ls$log$model), big.mark = "'"),
-             " observations"), 5),
+             " observations"), 6),
   rep(paste0("Careers: ", format(nrow(career_reg_ls$log$model), big.mark = "'"),
-             " observations"), 5), 
+             " observations"), 6), 
   rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$log$model), big.mark = "'"),
-             " observations"), 5))
+             " observations"), 6))
 
 tab_binary <- data.frame(FI_column,
                          var_column, ls_column,
@@ -1008,29 +816,21 @@ tab_binary_print <- tab_binary %>%
   as_flextable(hide_grouplabel = TRUE,
                col_keys = c("var_column",
                             "ls_column"))%>%
-  colformat_md(j = c(3)) %>%
+  colformat_md(j = c(2)) %>%
   set_header_labels(var_column = " ",
                     ls_column = "OR Estimate (95% CI)") %>%
   bold(bold = TRUE, part = c("header")) %>%
   set_caption(caption = "Odds ratios (OR) of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from one.") %>%
   width(width = 3) %>% 
-  hline(i = c(6, 12)) %>% 
-  bold(i = c(1, 7, 13))
+  hline(i = c(7, 14)) %>% 
+  bold(i = c(1, 8, 15))
 
 tab_binary_print 
 ```
 
-
-
-```{r ci pf count ssh}
-
-pf_count_ci_ls <- calculate_ci(
-  summary(
-    pf_reg_ls$count)$coefficients["ResponsibleApplicantGenderm", ])
-```
-
 In the Poisson regression summarized in Table \@ref(tab:tab-gender-count-ls), the outcome “positive words” is treated as a count variable rather than the binary presence/absence. Here we provide the rate ratios of the use of positive words (the exponential of the regression coefficient). These incident rate ratios, also called relative risks, essentially tell us how many more (or fewer) positive words are expected, compared to a reference for factor and binary variables, or for a unit change of the continuous explanatory variable. 
-We again do not observe significant gender differences for applicants in any of the funding schemes. In Projects and Spark, younger researchers tend to use more positive words than their older peers. As expected, more positive words can be found in longer texts. In Projects, researchers from the ETH Domain have a higher positive word count compared to cantonal universities, while in Careers, researchers affiliated in UAS and others tend to describe their research less positively than their peers from the cantonal universities.
+
+No evidence for a gender effect on the count a positive words is found in any of the Poisson regression models for the different funding schemes. In Projects and Spark, younger researchers tend to use more positive words than their older peers. Unsurprisingly, more positive words can be found in longer texts. In Projects, researchers from the ETH Domain have a higher positive word count compared to cantonal universities, while in Careers, researchers affiliated in UAS and others tend to describe their research less positively than their peers from the cantonal universities.  
 <!-- We can draw the same conclusions as in Table 1 for SSH applicants in Projects (22% more positive words for male applicants compared to their female peers) and Spark (21.6% fewer positive words in texts written by male researchers compared to their female peers). However now there is also evidence for an effect in MINT, where males in both Projects and Careers use on average 11% more positive words than their female counterparts. -->
 
 
@@ -1041,22 +841,20 @@ reg_gender_count_ls <- list(pf = pf_reg_ls$count,
                             spark = sparkabs_reg_ls$count)
 
 ls_column_count <- lapply(reg_gender_count_ls,
-                          FUN = tabulate_ci,  
-                          covariate_list = covariate_list,
-                          is_word = is_word) %>% simplify()
+                          FUN = tabulate_ci) %>% unlist()
 
-var_column <- rep(c("gender - male", "age (years)",
+var_column <- rep(c("Intercept", "gender - male", "age (years)",
                     "inst. type - ETH Domain", 
                     "inst. type - UAS and Other",
                     "text length (per 100 words)"), 3)
 
 FI_column <- c(
   rep(paste0("Projects: ", format(nrow(pf_reg_ls$count$model), big.mark = "'"),
-             " observations"), 5),
+             " observations"), 6),
   rep(paste0("Careers: ", format(nrow(career_reg_ls$count$model),
-                                 big.mark = "'"), " observations"), 5), 
+                                 big.mark = "'"), " observations"), 6), 
   rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$count$model),
-                               big.mark = "'"), " observations"), 5))
+                               big.mark = "'"), " observations"), 6))
 
 tab_count <- data.frame(FI_column, var_column, ls_column_count,
                         stringsAsFactors = FALSE)
@@ -1067,53 +865,70 @@ tab_count_print <- tab_count %>%
   as_flextable(hide_grouplabel = TRUE,
                col_keys = c("var_column",
                             "ls_column_count"))%>%
-  colformat_md(j = c(3)) %>%
+  colformat_md(j = c(2)) %>%
   set_header_labels(var_column = " ",
                     ls_column_count = "RR Estimate (95% CI)") %>%
   bold(bold = TRUE, part = c("header")) %>%
   set_caption(caption = "Rate ratios (RR) counting the number of positive terms in grant proposals. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold estimates are significantly different from one.")%>%
   width(width = 3) %>% 
-  hline(i = c(6, 12)) %>% 
-  bold(i = c(1, 7, 13))
+  hline(i = c(7, 14)) %>% 
+  bold(i = c(1, 8, 15))
 
 tab_count_print 
 ```
 
 
 ```{r prep-fig-interaction-gender, cache = FALSE, results = "asis", warning = FALSE, message = FALSE}
-# Spark abstracts
-spark_models <- list(ls = sparkabs_reg_ls$count)
-spark_pred <- lapply(spark_models, get_predict_words, 
-                     freq_data = sparkabs_freq_ls) %>% bind_rows(.id = "area")
 
-pf_models <- list(ls = pf_reg_ls$count)
-pf_pred <- lapply(pf_models, get_predict_words,
-                  freq_data = pf_freq_ls) %>% bind_rows(.id = "area")
+get_predict_words <- function(m, freq_data){
+  # For an applicant of average age with a proposal of average text 
+  # length employed at a cantonal university
+  newdata <- 
+    tibble(ResponsibleApplicantGender = c("f", "m"),
+           ResponsibleApplicantAgeAtSubmission = 
+             rep(mean(freq_data$ResponsibleApplicantAgeAtSubmission), 2),
+           ResearchInstitutionType = rep("Cantonal university", 2), 
+           text_length100 = rep(mean(freq_data$text_length100), 2))
+  
+  p <- predict(m, newdata = newdata, type = "response", se.fit = TRUE)
+  lwr <- with(p, fit + qnorm(0.025)*se.fit)
+  upr <- with(p, fit + qnorm(0.975)*se.fit)
+  
+  return(tibble(ResponsibleApplicantGender = c("f", "m"),
+                count = p$fit, 
+                lwr = lwr, upr = upr))
+}
 
-career_models <- list(ls = career_reg_ls$count)
-career_pred <- lapply(career_models, get_predict_words, 
-                      freq_data = career_freq_ls) %>% bind_rows(.id = "area")
+
+spark_pred <- get_predict_words(sparkabs_reg_ls$count,
+                                freq_data = sparkabs_freq_ls)
+
+pf_pred <- get_predict_words(pf_reg_ls$count,
+                             freq_data = pf_freq_ls)
+
+career_pred <- get_predict_words(career_reg_ls$count,
+                             freq_data = career_freq_ls)
+
+
 
 fig_spark_abs <- spark_pred %>% 
-  filter(area == "ls") %>% 
   mutate(ResponsibleApplicantGender = 
            case_when(ResponsibleApplicantGender == "f" ~ "Female",
                      ResponsibleApplicantGender == "m" ~ "Male")) %>% 
-  ggplot(aes(ResponsibleApplicantGender, pred))+
+  ggplot(aes(ResponsibleApplicantGender, count))+
   geom_pointrange(aes(ymin = lwr, ymax = upr),
                   position = position_dodge(width = 0.5)) +
   get_datastory_theme() +
-  ylab("Predicted number of words") +
+  ylab("Estimated number of words") +
   theme(axis.title.x = element_blank()) +
   ggtitle("Spark") +
   ylim(.8, 2)
   
 fig_pf <- pf_pred %>% 
-  filter(area == "ls") %>% 
   mutate(ResponsibleApplicantGender = 
            case_when(ResponsibleApplicantGender == "f" ~ "Female",
                      ResponsibleApplicantGender == "m" ~ "Male")) %>% 
-  ggplot(aes(ResponsibleApplicantGender, pred)) +
+  ggplot(aes(ResponsibleApplicantGender, count)) +
   geom_pointrange(aes(ymin = lwr, ymax = upr),
                   position = position_dodge(width = 0.5)) +
   get_datastory_theme() +
@@ -1124,11 +939,10 @@ fig_pf <- pf_pred %>%
 
 
 fig_career <- career_pred %>% 
-  filter(area == "ls") %>% 
   mutate(ResponsibleApplicantGender = 
            case_when(ResponsibleApplicantGender == "f" ~ "Female",
                      ResponsibleApplicantGender == "m" ~ "Male")) %>% 
-  ggplot(aes(ResponsibleApplicantGender, pred))+
+  ggplot(aes(ResponsibleApplicantGender, count))+
   geom_pointrange(aes(ymin = lwr, ymax = upr),
                   position = position_dodge(width = 0.5)) +
   get_datastory_theme() +
@@ -1139,7 +953,6 @@ fig_career <- career_pred %>%
 ```
 
 Figure \@ref(fig:fig-interaction-gender) illustrates the effects of gender on the language used in the Poisson regression models. The plots show the predicted number of positive words with 95% confidence error bars per gender, for an applicant of average age with a proposal of average text length from a cantonal university, for each funding scheme. 
-<!-- We observe the interesting difference between the Spark and Projects in the SSH domain in green, as discussed above. In Projects, male applicants used more positive words, while in Spark, female applicants used more positive words. In Careers, there was no significant difference as their confidence intervals overlap. -->
 
 We conclude that we cannot detect a difference in the use of positive words between male and female applicants in Life Sciences in any of the funding schemes. This is noteworthy, because the words used in our analysis were derived from PubMed abstracts (@Vinkers2015) and the original study (@Lerchenmueller) found a significant gender differences in their usage from clinical research and general life science articles indexed in PubMed. But that study only compared successful publications, while 
 this analysis <!-- our study -->
@@ -1158,252 +971,6 @@ ggarrange(fig_pf, fig_career, fig_spark_abs,
           nrow = 1)
 ```
 
-## Analysis of successful proposals only
-To perform an analysis more similar to the original version presented in @Lerchenmueller, we will now repeat our analysis on only the subset of proposals that were funded (or in the case of Spark, fundable). Table \@ref(tab:tab-gender-linear-stratify-approved) summarises the linear probability model on the successful proposals only. Compared to the model applied on all proposals, the conclusions stay the same for Careers and Spark, even though the magnitude of the coefficient estimates does change. In Projects, the evidence for an effect of the institution type weakens, while the evidence for an age-effect strengthens. The same conclusions and changes can be observed for the logistic regression model summarised for the successful proposals in Table \@ref(tab:tab-gender-binary-stratify-approved). 
-
-```{r get-approved-models}
-#--------------------------------------
-## ADAPTED FROM chunk_gender_on_language.R analysis: gender on language
-#--------------------------------------
-# Analysis of the whether gender has an effect on the use of words as through..
-# .. binary variable for the presence of at least one positive word
-# .. .. using linear probability models
-# .. .. using logistic regression models
-# .. the count of distinct positive words using Poisson regression
-# .. .. quasipoisson and negative binomial regression
-
-
-# spark abstracts
-# ---------------
-sparkabs_reg_ls_fundable <- sparkabs_freq_ls_fundable %>%
-  analyze_gender()
-
-# pf abstracts
-# ---------------
-pf_reg_ls_approved <- pf_freq_ls_approved %>%
-  analyze_gender()
-
-# career abstracts
-# ---------------
-career_reg_ls_approved <- career_freq_ls_approved %>%
-  analyze_gender()
-
-```
-
-```{r tab-gender-linear-stratify-approved, message = FALSE, warning = FALSE, cache = F, results = "asis"}
-# list of covariates to be reported
-covariate_list <- names(coefficients(sparkabs_reg_ls_fundable$linear))[-1]
-# regression results 
-reg_gender_linear_ls <- list(pf = pf_reg_ls_approved$linear, 
-                             career = career_reg_ls_approved$linear ,
-                             spark = sparkabs_reg_ls_fundable$linear)
-
-ls_column_linear <- lapply(reg_gender_linear_ls,
-                           FUN = tabulate_lm_ci,  
-                           covariate_list = covariate_list,
-                           is_word = is_word) %>% simplify()
-
-var_column <- rep(c("gender - male", "age (years)",
-                    "inst. type - ETH Domain", 
-                    "inst. type - UAS and Other",
-                    "text length (per 100 words)"), 3)
-
-FI_column <- c(
-  rep(paste0("Projects: ", format(nrow(pf_reg_ls_approved$linear$model),
-                                  big.mark = "'"), " observations"), 5),
-  rep(paste0("Careers: ", format(nrow(career_reg_ls_approved$linear$model),
-                                 big.mark = "'"), " observations"), 5), 
-  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls_fundable$linear$model),
-                               big.mark = "'"), " observations"), 5))
-
-tab_linear <- data.frame(FI_column,
-                         var_column, ls_column_linear,
-                         stringsAsFactors = FALSE)
-row.names(tab_linear) <- NULL
-
-tab_linear_print <- tab_linear %>% 
-  as_grouped_data(groups = "FI_column") %>%
-  as_flextable(hide_grouplabel = TRUE,
-               col_keys = c("var_column",
-                            "ls_column_linear"))%>%
-  colformat_md(j = c(3)) %>%
-  set_header_labels(var_column = " ",
-                    ls_column_linear = "Coefficient Estimate (95% CI)") %>%
-  bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Multivariate linear probability model of applicants of successful proposals using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from zero.")%>%
-  width(width = 3) %>% 
-  hline(i = c(6, 12)) %>% 
-  bold(i = c(1, 7, 13))
-
-tab_linear_print 
-```
-
-\pagebreak 
-
-```{r tab-gender-binary-stratify-approved, message = FALSE, warning = FALSE, cache = F, results = "asis"}
-# list of covariates to be reported
-covariate_list <- names(coefficients(sparkabs_reg_ls_fundable$log))[-1]
-# regression results 
-reg_gender_binary_ls_approved <- list(pf = pf_reg_ls_approved$log, 
-                                      career = career_reg_ls_approved$log,
-                                      spark = sparkabs_reg_ls_fundable$log)
-
-ls_column_approved <- lapply(reg_gender_binary_ls_approved,
-                             FUN = tabulate_ci,  
-                             covariate_list = covariate_list,
-                             is_word = is_word) %>% simplify()
-
-var_column <- rep(c("gender - male", "age (years)",
-                    "inst. type - ETH Domain", 
-                    "inst. type - UAS and Other",
-                    "text length (per 100 words)"), 3)
-
-FI_column <- c(
-  rep(paste0("Projects: ", format(nrow(pf_reg_ls_approved$log$model),
-                                  big.mark = "'"), " observations"), 5),
-  rep(paste0("Careers: ", format(nrow(career_reg_ls_approved$log$model),
-                                 big.mark = "'"), " observations"), 5), 
-  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls_fundable$log$model),
-                               big.mark = "'"), " observations"), 5))
-
-tab_binary_approved <- data.frame(FI_column,
-                                  var_column, ls_column_approved,
-                                  stringsAsFactors = FALSE)
-row.names(tab_binary_approved) <- NULL
-
-tab_binary_approved_print <- tab_binary_approved %>% 
-  as_grouped_data(groups = "FI_column") %>%
-  as_flextable(hide_grouplabel = TRUE,
-               col_keys = c("var_column",
-                            "ls_column_approved"))%>%
-  colformat_md(j = c(3)) %>%
-  set_header_labels(var_column = " ",
-                    ls_column_approved = "OR Estimate (95% CI)") %>%
-  bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Odds ratios (OR) of applicants of successful proposals using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from one.") %>% 
-  width(width = 3) %>% 
-  hline(i = c(6, 12)) %>% 
-  bold(i = c(1, 7, 13))
-
-tab_binary_approved_print 
-```
-
-Finally, Table \@ref(tab:tab-gender-count-ls-approved) shows the results of the Poisson model on the successful proposals. Again, in Careers and Spark we do not observe a substantial change in the conclusions. However, in Projects, we do now have evidence for a gender effect, with male researchers using more positive words in their proposal abstract than their female peers. 
-
-Figure \@ref(fig:fig-interaction-gender-approved) shows the effects of gender on the language used in the Poisson regression models for the successful proposals only.  Compared to the situation when all proposals are considered, we see that successful female applicants in Careers and Spark actually tended to use more positive words than their male peers, while in Projects male applicants use more in each proposal, and the difference is stronger when only successful proposals are considered.
-
-Since the Projects funding schemes funds all types of bottom-up research from all types of researchers, it is perhaps the most similar funding scheme to the data in the original @Lerchenmueller study. These results therefore seem to confirm the original finding, at least in the most similar of the three settings analyzed here, although we observe a weaker effect size.
-
-```{r tab-gender-count-ls-approved, message = FALSE, warning = FALSE, cache = F, results = "asis"}
-# regression results for reach research area
-reg_gender_count_ls_approved <- list(pf = pf_reg_ls_approved$count, 
-                                     career = career_reg_ls_approved$count,
-                                     spark = sparkabs_reg_ls_fundable$count)
-
-ls_column_count_approved <- lapply(reg_gender_count_ls_approved,
-                                   FUN = tabulate_ci,  
-                                   covariate_list = covariate_list,
-                                   is_word = is_word) %>% simplify()
-
-var_column <- rep(c("gender - male", "age (years)",
-                    "inst. type - ETH Domain", 
-                    "inst. type - UAS and Other",
-                    "text length (per 100 words)"), 3)
-
-FI_column <- c(
-  rep(paste0("Projects: ", format(nrow(pf_reg_ls_approved$count$model),
-                                  big.mark = "'"), " observations"), 5),
-  rep(paste0("Careers: ", format(nrow(career_reg_ls_approved$count$model),
-                                 big.mark = "'"), " observations"), 5), 
-  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls_fundable$count$model),
-                               big.mark = "'"), " observations"), 5))
-
-tab_count_approved <- data.frame(FI_column, var_column, 
-                                 ls_column_count_approved,
-                                 stringsAsFactors = FALSE)
-row.names(tab_count_approved) <- NULL
-
-tab_count_print <- tab_count_approved %>% 
-  as_grouped_data(groups = "FI_column") %>%
-  as_flextable(hide_grouplabel = TRUE,
-               col_keys = c("var_column",
-                            "ls_column_count_approved"))%>%
-  colformat_md(j = c(3)) %>%
-  set_header_labels(var_column = " ",
-                    ls_column_count_approved = "RR Estimate (95% CI)") %>%
-  bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Rate ratios (RR) counting the number of positive terms in successful grant proposals.. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold estimates are significantly different from one.")%>%
-  width(width = 3) %>% 
-  hline(i = c(6, 12)) %>% 
-  bold(i = c(1, 7, 13))
-
-tab_count_print 
-```
-
-```{r prep-fig-interaction-gender-approved, cache = FALSE, results = "asis", warning = FALSE, message = FALSE}
-# Spark abstracts
-spark_models_fundable <- list(ls = sparkabs_reg_ls_fundable$count)
-spark_pred_fundable <- lapply(spark_models_fundable, get_predict_words,
-                              freq_data = sparkabs_freq_ls_fundable) %>% 
-  bind_rows(.id = "area")
-
-pf_models_approved <- list(ls = pf_reg_ls_approved$count)
-pf_pred_approved <- lapply(pf_models_approved, get_predict_words,
-                           freq_data = pf_freq_ls_approved) %>% 
-  bind_rows(.id = "area")
-
-career_models_approved <- list(ls = career_reg_ls_approved$count)
-career_pred_approved <- lapply(career_models_approved, get_predict_words, 
-                               freq_data = career_freq_ls_approved) %>%
-  bind_rows(.id = "area")
-
-fig_spark_abs_fundable <- spark_pred_fundable %>% 
-  filter(area == "ls") %>% 
-  mutate(ResponsibleApplicantGender = 
-           case_when(ResponsibleApplicantGender == "f" ~ "Female",
-                     ResponsibleApplicantGender == "m" ~ "Male")) %>% 
-  ggplot(aes(ResponsibleApplicantGender, pred))+
-  geom_pointrange(aes(ymin=lwr,ymax=upr),position = position_dodge(width = 0.5)) +
-  get_datastory_theme() +
-  ylab("Predicted number of words") +
-  theme(axis.title.x = element_blank()) +
-  ggtitle("Spark") +
-  ylim(.8, 2)
-  
-
-fig_pf_approved <- pf_pred_approved %>% 
-  filter(area == "ls") %>% 
-  mutate(ResponsibleApplicantGender = 
-           case_when(ResponsibleApplicantGender == "f" ~ "Female",
-                     ResponsibleApplicantGender == "m" ~ "Male")) %>% 
-  ggplot(aes(ResponsibleApplicantGender, pred)) +
-  geom_pointrange(aes(ymin=lwr,ymax=upr),position = position_dodge(width = 0.5)) +
-  get_datastory_theme() +
-  ylab("Predicted number of words") +
-  theme(axis.title.x = element_blank()) +
-  ggtitle("Projects") + 
-  ylim(.8, 2)
-
-
-fig_career_approved <- career_pred_approved %>% 
-  filter(area == "ls") %>% 
-  mutate(ResponsibleApplicantGender = 
-           case_when(ResponsibleApplicantGender == "f" ~ "Female",
-                     ResponsibleApplicantGender == "m" ~ "Male")) %>% 
-  ggplot(aes(ResponsibleApplicantGender, pred))+
-  geom_pointrange(aes(ymin=lwr,ymax=upr),position = position_dodge(width = 0.5)) +
-  get_datastory_theme() +
-  ylab("Predicted number of words") +
-  theme(axis.title.x = element_blank()) +
-  ggtitle("Careers") +
-  ylim(.8, 2)
-```
-
-```{r fig-interaction-gender-approved, fig.width = 6,fig.height = 3.5, fig.cap = "Illustration of the effects of gender on the language used in the Poisson regression models, for approved proposals. The plots show the predicted number of positive words with 95% confidence error bars per gender, for an applicant of average age with a proposal of average text length, for each funding scheme.", cache = FALSE, results = "asis", warning = FALSE, message = FALSE}
-
-ggarrange(fig_pf_approved, fig_career_approved, fig_spark_abs_fundable,
-          nrow = 1)
-```
 
 # Discussion
 
@@ -1455,32 +1022,22 @@ p <- cowplot::plot_grid(pf_plot +
                           labs(title = "Spark") +
                           theme(legend.position = "none"),
                         ncol = 1)
-                        
-title <- ggdraw() +
-  draw_label("Positive word distribution by gender", fontface = "bold")
-
+                    
 grobs <- ggplotGrob(pf_plot)$grobs
 legend <-
   grobs[[which(sapply(grobs, function(x)
     x$name) == "guide-box")]]
 
-plot_grid(title,
-          p,
+plot_grid(p,
           legend,
           ncol = 1,
-          rel_heights = c(0.1, 1, 0.05))
+          rel_heights = c(1, 0.05))
 ```
 
 
 ```{r fig-distribution-number-poswords-inst, fig.height = 8, fig.width = 6, fig.cap = "Distribution of the number of positive words by Institution Type and funding scheme.", message = FALSE, warning = FALSE}
 
 p_pf <- pf_freq_ls %>% 
-  mutate(ResearchInstitutionType = 
-           case_when(ResearchInstitutionType %in% 
-                       c("Other", "Other research institutes", 
-                         "Hospitals (non-university)",
-                         "University of applied sciences") ~ "UAS and Other",
-                     TRUE ~ ResearchInstitutionType)) %>% 
   group_by(ResearchInstitutionType) %>% 
   count(sum_pos) %>% 
   mutate(sum_pos = case_when(sum_pos >= 7 ~ "7+",
@@ -1503,12 +1060,6 @@ p_pf <- pf_freq_ls %>%
   ggtitle(paste0("Projects")) 
 
 p_careers <- career_freq_ls %>% 
-  mutate(ResearchInstitutionType = 
-           case_when(ResearchInstitutionType %in% 
-                       c("Other", "Other research institutes", 
-                         "Hospitals (non-university)",
-                         "University of applied sciences") ~ "UAS and Other",
-                     TRUE ~ ResearchInstitutionType))%>% 
   group_by(ResearchInstitutionType) %>% 
   count(sum_pos) %>% 
   mutate(sum_pos = case_when(sum_pos >= 7 ~ "7+",
@@ -1531,12 +1082,6 @@ p_careers <- career_freq_ls %>%
   ggtitle(paste0("Careers")) 
 
 p_spark <- sparkabs_freq_ls %>% 
-    mutate(ResearchInstitutionType = 
-             case_when(ResearchInstitutionType %in% 
-                         c("Other", "Other research institutes", 
-                           "Hospitals (non-university)",
-                           "University of applied sciences") ~ "UAS and Other",
-                       TRUE ~ ResearchInstitutionType))%>% 
   group_by(ResearchInstitutionType) %>% 
   count(sum_pos) %>% 
   mutate(sum_pos = case_when(sum_pos >= 7 ~ "7+",
@@ -1562,20 +1107,14 @@ p <- cowplot::plot_grid(p_pf + theme(legend.position = "none"),
                         p_careers + theme(legend.position = "none"),
                         p_spark + theme(legend.position = "none"),
                         ncol = 1)
-                        
-title <- ggdraw() +
-  draw_label("Positive word counts by institution type",
-             fontface = "bold")
 
-grobs <- ggplotGrob(p_pf)$grobs
 legend <-
   grobs[[which(sapply(grobs, function(x)
     x$name) == "guide-box")]]
 
-plot_grid(title,
-          p,
+plot_grid(p,
           legend,
           ncol = 1,
-          rel_heights = c(0.1, 1, 0.05))
+          rel_heights = c(1, 0.05))
 ```
 
