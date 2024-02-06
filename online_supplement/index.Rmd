@@ -1,6 +1,6 @@
 ---
 title: "Online reproducible supplement"
-subtitle: "Text analysis of self-promotional language across genders in grant proposals"
+subtitle: "Cross-sectional analysis of self-promotional language in texts of grant proposals across gender"
 header-includes:
    - \usepackage{dcolumn}
    - \usepackage{booktabs}
@@ -294,7 +294,7 @@ Figure \@ref(fig:fig-specific-words) then show the share of proposals with at le
 
 Then, Table \@ref(tab:tab-gender-linear-stratify) shows the results of the multivariate linear probability model adjusted for age (in years), the institution type and the length of the texts. Evidence for a gender effect on the presence of a positive word cannot be found in any of the models for the different funding scheme. Unsurprisingly, the length of the text increases the chance of a positive word. Additionally, we find evidence for an effect of the institution type in proposals to Projects: compared to researchers from cantonal universities, researchers affiliated to the ETH Domain have a higher probability of using at least one positive word when describing their research projects. 
 
-Table \@ref(tab:tab-gender-binary-stratify) shows the odds ratios from the logistic regression, modelling the binary outcome “at least one positive word”, for all three data sources. A gender OR (male vs. female) larger than 1 suggests that male researchers are more likely to use at least one positive word compared to female researchers (used as the reference). We again do not see any evidence for gender differences in language usage in any of the funding schemes. The results are indeed very similar to the linear probability model which is reassuring.  
+<!-- Table \@ref(tab:tab-gender-binary-stratify) shows the odds ratios from the logistic regression, modelling the binary outcome “at least one positive word”, for all three data sources. A gender OR (male vs. female) larger than 1 suggests that male researchers are more likely to use at least one positive word compared to female researchers (used as the reference). We again do not see any evidence for gender differences in language usage in any of the funding schemes. The results are indeed very similar to the linear probability model which is reassuring.   -->
 
 ```{r fig-distribution-number-poswords-inst, fig.height = 8, fig.width = 6, fig.cap = "Distribution of the number of positive words by Institution Type and funding scheme.", message = FALSE, warning = FALSE}
 
@@ -454,7 +454,7 @@ tab_linear_print <- tab_linear %>%
   set_header_labels(var_column = " ",
                     ls_column_linear = "Coefficient Estimate (95% CI)") %>%
   bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from zero.")%>%
+  set_caption(caption = "Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. ")%>%
   width(width = 3) %>% 
   hline(i = c(7, 14)) %>% 
   bold(i = c(1, 8, 15))
@@ -472,7 +472,7 @@ reg_gender_binary_ls <- list(pf = pf_reg_ls$log,
 
 tabulate_ci <- function(m, digits = 3){
   v <- cbind(exp(m$coefficients), exp(confint(m))) 
-  paste0(round(v[ ,1], digits), " (", round(v[ , 2], digits), "--",
+  paste0(round(v[ ,1], digits), " (", round(v[ , 2], digits), "-",
          round(v[ ,3], digits), ")") %>% 
     return()
 }
@@ -507,10 +507,10 @@ tab_binary_print <- tab_binary %>%
   set_header_labels(var_column = " ",
                     ls_column = "OR Estimate (95% CI)") %>%
   bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Odds ratios (OR) of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from one.") %>%
+  set_caption(caption = "Odds ratios (OR) of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'.") %>%
   width(width = 3) %>% 
   hline(i = c(7, 14)) %>% 
   bold(i = c(1, 8, 15))
 
-tab_binary_print 
+# tab_binary_print 
 ```

@@ -1,5 +1,5 @@
 ---
-title: "Text analysis of self-promotional language across genders in grant proposals"
+title: "Cross-sectional analysis of self-promotional language in texts of grant proposals across gender"
 header-includes:
    - \usepackage{dcolumn}
    - \usepackage{booktabs}
@@ -538,9 +538,9 @@ The positive words included in this study, as defined by @Vinkers2015 based on p
 ## Statistical analysis
 
 To determine whether the use of positive language is associated with the gender of the grant applicant, @Lerchenmueller used multivariate linear probability regressions to model the binary outcome of whether a positive word was used at least once. To replicate their results, we followed the same procedure. In addition, we perform a logistic regression to model the same binary outcome, as we view this type of model to be more suited to answer our research question.  In addition, we perform a Poisson regression to model the count of positive word, to see if one gender might use a higher number of positive words. For all models, the age of the applicant, the type of institution, and the length of the text are taken as covariates, with gender as the variable of interest. 
-The models are adjusted for age because we consider the applicant’s age to be a confounder. Age is a reasonable proxy for career stage, and it is understandable that researchers at different stages of their careers would construct texts differently. We additionally adjust for the institution type as a reasonable, but imperfect proxy for prestige. Depending on the reputation of the institutions, as well as the investment the institutions make in their individual grant writing services, the affiliated researchers may write more positively about their research (for example, see Figure S1 in the [online supplement](https://snsf-data/positive_language/online_supplement/index.html)). Additionally, the gender distributions at the different institution types varies considerably. The models are adjusted for the length of the texts, as longer text have higher likelihood of containing more positive words. Proposals to Projects, Careers and Spark are analysed in separate models. 
+The models are adjusted for age because we consider the applicant’s age to be a confounder. Age is a reasonable proxy for career stage, and it is understandable that researchers at different stages of their careers would construct texts differently. We additionally adjust for the institution type as a reasonable, but imperfect proxy for prestige. Depending on the reputation of the institutions, as well as the investment the institutions make in their individual grant writing services, the affiliated researchers may write more positively about their research (for example, see Figure S1 in the [online supplement](https://snsf-data/positive_language/online_supplement/index.html)). The gender distributions at the different institution types varies considerably. The models are adjusted for the length of the texts (in word count per 100 words), as longer texts have higher likelihood of containing more positive words. Proposals to Projects, Careers and Spark are analysed in separate models. 
 
-We will determine the presence or absence of evidence of an effect based on effect estimates weith 95% confidence intervals, which address the size of an effect more directly than p-values (@Wasserstein2016).
+We will determine the presence or absence of evidence of an effect based on effect estimates with 95% confidence intervals, which address the size of an effect more directly than p-values (@Wasserstein2016). All analyses were done in R [REF] version 4.3.2. 
 
 <!-- \pagebreak -->
 
@@ -719,7 +719,7 @@ plot_grid(p,
 
 We present results of the regression models relating the gender of the applicant to the use of positive language. 
 
-Summary tables for the multivariate linear probability model and from the logistic regression model, both modeling the binary outcome “at least one positive word”, can be found in Tables S1 and S2 in the [online supplement](https://snsf-data/positive_language/online_supplement/index.html). 
+The logistic regression model modeling the binary outcome “at least one positive word” is summarised in the first column of Table \@ref(tab:tab-gender-binary-count-ls). A summary table for the multivariate linear probability model modeling the binary outcome in the same way as @Lerchenmueller, can be found in Tables S1 in the [online supplement](https://snsf-data/positive_language/online_supplement/index.html). 
 In these models, the only estimates suggesting evidence for an effect was found to be the length of the texts, i.e., positive coefficient with 95% CI not including zero. In Projects only, researchers affiliated to the ETH Domain were found to have a higher probability of using at least one positive word when describing their research projects. No evidence for a gender effect on the presence of at least one positive word is found in any of the binary outcome models.
 
 ```{r tab-gender-linear-stratify, message = FALSE, warning = FALSE, cache = F, results = "asis"}
@@ -759,21 +759,6 @@ tab_linear <- data.frame(FI_column,
                          stringsAsFactors = FALSE)
 row.names(tab_linear) <- NULL
 
-tab_linear_print <- tab_linear %>% 
-  as_grouped_data(groups = "FI_column") %>%
-  as_flextable(hide_grouplabel = TRUE,
-               col_keys = c("var_column",
-                            "ls_column_linear")) %>%
-  colformat_md(j = c(2)) %>%
-  set_header_labels(var_column = " ",
-                    ls_column_linear = "Coefficient Estimate (95% CI)") %>%
-  bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from zero.")%>%
-  width(width = 3) %>% 
-  hline(i = c(7, 14)) %>% 
-  bold(i = c(1, 8, 15))
-
-tab_linear_print 
 ```
 
 
@@ -813,27 +798,10 @@ tab_binary <- data.frame(FI_column,
                          stringsAsFactors = FALSE)
 row.names(tab_binary) <- NULL
 
-tab_binary_print <- tab_binary %>% 
-  as_grouped_data(groups = "FI_column") %>%
-  as_flextable(hide_grouplabel = TRUE,
-               col_keys = c("var_column",
-                            "ls_column"))%>%
-  colformat_md(j = c(2)) %>%
-  set_header_labels(var_column = " ",
-                    ls_column = "OR Estimate (95% CI)") %>%
-  bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Odds ratios (OR) of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from one.") %>%
-  width(width = 3) %>% 
-  hline(i = c(7, 14)) %>% 
-  bold(i = c(1, 8, 15))
 
-tab_binary_print 
 ```
 
-In the Poisson regression summarized in Table \@ref(tab:tab-gender-count-ls), the outcome “positive words” is treated as a count variable rather than the binary presence/absence. Here we provide the rate ratios of the use of positive words (the exponential of the regression coefficient). These incident rate ratios, also called relative risks, essentially tell us how many more (or fewer) positive words are expected, compared to a reference for factor and binary variables, or for a unit change of the continuous explanatory variable. 
-
-No evidence for a gender effect on the count a positive words is found in any of the Poisson regression models for the different funding schemes. In Projects and Spark, younger researchers tend to use more positive words than their older peers. Unsurprisingly, more positive words can be found in longer texts. In Projects, researchers from the ETH Domain have a higher positive word count compared to cantonal universities, while in Careers, researchers affiliated in UAS and others tend to describe their research less positively than their peers from the cantonal universities.  
-<!-- We can draw the same conclusions as in Table 1 for SSH applicants in Projects (22% more positive words for male applicants compared to their female peers) and Spark (21.6% fewer positive words in texts written by male researchers compared to their female peers). However now there is also evidence for an effect in MINT, where males in both Projects and Careers use on average 11% more positive words than their female counterparts. -->
+In the Poisson regression summarized in the second column of Table \@ref(tab:tab-gender-binary-count-ls), the outcome “positive words” is treated as a count variable rather than the binary presence/absence. Here we provide the rate ratios of the use of positive words (the exponential of the regression coefficient). These incident rate ratios essentially tell us how many more (or fewer) positive words are expected, compared to a reference for factor and binary variables, or for a unit change of the continuous explanatory variable. The interpretation of rate ratios for Poisson regression is closely related to that of odds ratios for logistic regression. No evidence for a gender effect on the count of positive words is found in any of the Poisson regression models for the different funding schemes. In Projects and Spark, younger researchers tend to use more positive words than their older peers. Unsurprisingly, more positive words can be found in longer texts. In Projects, researchers from the ETH Domain have a higher positive word count compared to cantonal universities, while in Careers, researchers affiliated in UAS and others tend to describe their research less positively than their peers from the cantonal universities.  
 
 
 ```{r tab-gender-count-ls, message = FALSE, warning = FALSE, cache = F, results = "asis"}
@@ -862,21 +830,28 @@ tab_count <- data.frame(FI_column, var_column, ls_column_count,
                         stringsAsFactors = FALSE)
 row.names(tab_count) <- NULL
 
-tab_count_print <- tab_count %>% 
+```
+
+
+```{r tab-gender-binary-count-ls, message = FALSE, warning = FALSE, cache = F, results = "asis"}
+tab_binary %>% 
+  left_join(tab_count,
+            by = c("FI_column", "var_column")) %>% 
   as_grouped_data(groups = "FI_column") %>%
   as_flextable(hide_grouplabel = TRUE,
                col_keys = c("var_column",
-                            "ls_column_count"))%>%
+                            "ls_column", "ls_column_count")) %>% 
   colformat_md(j = c(2)) %>%
   set_header_labels(var_column = " ",
-                    ls_column_count = "RR Estimate (95% CI)") %>%
+                    ls_column_count = "RR Estimate (95% CI)",
+                    ls_column = "OR Estimate (95% CI)") %>%
+  add_header_row(values = c(" ", "Logistic model for presence", "Poisson model for the count"), 
+                 colwidths = c(1, 1, 1), top = TRUE) %>% 
   bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Rate ratios (RR) counting the number of positive terms in grant proposals. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold estimates are significantly different from one.")%>%
+  set_caption(caption = "Summary of the logistic model using odds ratios (OR) and summary of the poisson model using rate ratios (RR), with 95% confidence intervals (CI). The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'.") %>%
   width(width = 3) %>% 
   hline(i = c(7, 14)) %>% 
   bold(i = c(1, 8, 15))
-
-tab_count_print 
 ```
 
 
@@ -919,7 +894,7 @@ fig_pf <- pf_pred %>%
   ggplot(aes(ResponsibleApplicantGender, count)) +
   geom_pointrange(aes(ymin = lwr, ymax = upr),
                   position = position_dodge(width = 0.5)) +
-  ylab("Estimated number of words") +
+  ylab("Estimated number of positive words") +
   xlab("Applicant gender") + 
   ggtitle("Projects") + 
   ylim(.8, 2) + 
@@ -936,7 +911,7 @@ fig_career <- career_pred %>%
   ggplot(aes(ResponsibleApplicantGender, count))+
   geom_pointrange(aes(ymin = lwr, ymax = upr),
                   position = position_dodge(width = 0.5)) +
-  ylab("Estimated number of words") +
+  ylab("Estimated number of positive words") +
   xlab("Applicant gender") + 
   ggtitle("Careers") +
   ylim(.8, 2) +
@@ -953,7 +928,7 @@ fig_spark_abs <- spark_pred %>%
   ggplot(aes(ResponsibleApplicantGender, count))+
   geom_pointrange(aes(ymin = lwr, ymax = upr),
                   position = position_dodge(width = 0.5)) +
-  ylab("Estimated number of words") +
+  ylab("Estimated number of positive words") +
   xlab("Applicant gender") + 
   ggtitle("Spark") +
   ylim(.8, 2) +
