@@ -17,7 +17,8 @@ plot_positivewords <- function(freq_word, pos_words) {
     ungroup() %>%
     gather(key = words, count, novel:inspiring) %>%
     left_join(freq_word %>% 
-                count(ResponsibleApplicantGender)) %>%
+                count(ResponsibleApplicantGender),
+              by = "ResponsibleApplicantGender") %>%
     mutate(prevalence = count * 100 / n) %>%
     ungroup() %>%
     arrange(prevalence) %>% 

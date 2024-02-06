@@ -1,0 +1,516 @@
+---
+title: "Online reproducible supplement"
+subtitle: "Text analysis of self-promotional language across genders in grant proposals"
+header-includes:
+   - \usepackage{dcolumn}
+   - \usepackage{booktabs}
+   - \usepackage{makecell}
+output:
+   bookdown::html_document2:
+    fig_cap: TRUE
+    theme: paper
+    highlight: null
+    mathjax: null
+    self_contained: true
+    code_folding: hide
+urlcolor: #6684c1
+link-citations: true
+---
+
+```{r init, include=FALSE, warning=FALSE}
+# kableExtra for kable-tables
+options(kableExtra.latex.load_packages = FALSE )
+library(kableExtra)
+
+library(snf.datastory)
+# devtools::install_github("snsf-data/snf.datastory")
+# or renv::install("snsf-data/snf.datastory")
+
+# Use here("...") with paths relative to the project root
+# to address files
+library(here)
+# Avoid dependency on load order of packages
+# library(conflicted)
+
+# conflict_prefers 
+# if you'd like to see futher updates, tell rhe.
+# conflict_prefer("filter", "dplyr")
+# conflict_prefer("select", "dplyr")
+# conflict_prefer("here", "here")
+# conflict_prefer("list", "base")
+# conflict_prefer("as_image", "kableExtra")
+# conflict_prefer("group_rows", "kableExtra")
+# More libraries
+library(cowplot)
+library(texreg)
+library(broom)
+library(dplyr)
+library(tm)
+# library(cld3)
+library(sandwich)
+library(msm)
+library(tidyr)
+library(ggpubr)
+library(flextable)
+library(ftExtra)
+library(stringr)
+
+
+library(readxl)
+# windowsFonts("Source Sans" = windowsFont("Source Sans Pro Regular"))
+# change this to false if desired output is pdf
+is_word = TRUE
+```
+
+```{r load-ls-data, cache = FALSE, echo = FALSE, results = 'hide'}
+
+# Load the data from Zenodo:
+url <- "https://zenodo.org/record/6676562/files/positive_words_frequencies.xlsx"
+destfile <- "positive_words_frequencies.xlsx"
+curl::curl_download(url, destfile)
+
+career_freq_ls <-  read_xlsx(destfile, sheet = "career") %>% 
+  mutate(Number = 1:n()) %>% 
+  mutate(ResearchInstitutionType = 
+           case_when(ResearchInstitutionType %in% 
+                       c("Other", "Other research institutes", 
+                         "Hospitals (non-university)",
+                         "University of applied sciences") ~ "UAS and Other",
+                     TRUE ~ ResearchInstitutionType))
+
+sparkabs_freq_ls <- read_xlsx(destfile, sheet = "spark") %>% 
+  mutate(Number = 1:n()) %>% 
+  mutate(ResearchInstitutionType = 
+           case_when(ResearchInstitutionType %in% 
+                       c("Other", "Other research institutes", 
+                         "Hospitals (non-university)",
+                         "University of applied sciences") ~ "UAS and Other",
+                     TRUE ~ ResearchInstitutionType))
+
+pf_freq_ls <- read_xlsx(destfile, sheet = "projects") %>% 
+  mutate(Number = 1:n()) %>% 
+  mutate(ResearchInstitutionType = 
+           case_when(ResearchInstitutionType %in% 
+                       c("Other", "Other research institutes", 
+                         "Hospitals (non-university)",
+                         "University of applied sciences") ~ "UAS and Other",
+                     TRUE ~ ResearchInstitutionType))
+
+# 25 positive words as suggested in Vinkers et al (2015)
+pos_words <- c(
+  "novel",
+  "unique",
+  "promising",
+  "favorable|favourable",
+  "robust",
+  "excellent",
+  "prominent",
+  "supportive",
+  "encouraging",
+  "remarkable",
+  "innovative",
+  "unprecedented",
+  "bright",
+  "enormous",
+  "reassuring",
+  "creative",
+  "assuring",
+  "hopeful",
+  "astonishing",
+  "spectacular",
+  "amazing",
+  "inventive",
+  "phenomenal",
+  "groundbreaking",
+  "inspiring"
+)
+
+```
+
+```{r load-function-etc, cache = FALSE, echo = FALSE, results = 'hide'}
+# Code to format tables and figures
+source(here::here("r_functions.R"))
+```
+
+```{r load-function-etc2, cache = FALSE, echo = FALSE, results = 'hide'}
+# Number of proposals
+total_spark <- nrow(sparkabs_freq_ls)
+total_pf <- nrow(pf_freq_ls)
+total_career <- nrow(career_freq_ls)
+
+# Percentage international applicants
+pct_int_spark <- table(sparkabs_freq_ls$NationalityIsoCode=="CH")[1]/
+  table(is.na(sparkabs_freq_ls$NationalityIsoCode))[1]*100
+pct_int_pf <- table(pf_freq_ls$NationalityIsoCode=="CH")[1]/
+  table(is.na(pf_freq_ls$NationalityIsoCode))[1]*100
+pct_int_career <- table(career_freq_ls$NationalityIsoCode=="CH")[1]/
+  table(is.na(career_freq_ls$NationalityIsoCode))[1]*100
+
+# Success Rates
+sr_spark <- sparkabs_freq_ls %>%
+  summarise(sr = round(length(which(IsFundable == 1)) / n() * 100, 1))
+sr_pf <- pf_freq_ls %>%
+  summarise(sr = round(length(which(IsApproved == 1)) / n() * 100, 1))
+sr_career <- career_freq_ls %>% 
+  summarise(sr = round(length(which(IsApproved == 1)) / n() * 100, 1))
+
+
+## ----------------------------
+## data summary
+## ----------------------------
+# Gender distribution of applicants and success rate per research area
+# ... spark abstracts (only look at fundable vs non-fundable)
+gender_spark <- sparkabs_freq_ls %>%
+  group_by(ResponsibleApplicantGender,
+           IsFundable) %>%
+  count() %>%
+  group_by(ResponsibleApplicantGender) %>%
+  mutate(total = sum(n),
+         rate_plot = n/total,
+         rate = paste0(format(round(n * 100 / total, 1), nsmall = 1), "%")) %>%
+  # filter(IsFundable == 1) %>%
+  select(ResponsibleApplicantGender,
+         IsFundable,
+         n,
+         rate,
+         rate_plot,
+         total)
+
+
+# ... pf
+gender_pf <- pf_freq_ls %>%
+  group_by(ResponsibleApplicantGender,
+           IsApproved) %>%
+  count() %>% 
+  group_by(ResponsibleApplicantGender) %>%
+  mutate(total = sum(n),
+         rate_plot = n/total,
+         rate = paste0(format(round(n * 100 / total, 1), nsmall = 1), "%")) %>%
+  # filter(IsApproved == 1) %>%
+  select(ResponsibleApplicantGender,
+         IsApproved,
+         n,
+         rate,
+         rate_plot,
+         total)
+
+# ... career
+gender_career <- career_freq_ls %>%
+  group_by(ResponsibleApplicantGender,
+           IsApproved) %>%
+  count() %>%
+  group_by(ResponsibleApplicantGender) %>%
+  mutate(total = sum(n),
+         rate_plot = n/total,
+         rate = paste0(format(round(n * 100 / total, 1), nsmall = 1), "%")) %>%
+  # filter(IsApproved == 1) %>%
+  select(ResponsibleApplicantGender,
+         IsApproved,
+         n, 
+         rate,
+         rate_plot,
+         total)
+
+
+# EDA % of applications with positive words
+
+spark_numbers <- sparkabs_freq_ls %>% 
+  select(Number, sum_pos) %>%
+  mutate(is_positive = if_else(sum_pos > 0, 1, 0)) %>%
+  group_by(is_positive) %>%
+  summarise(n_app = n(), .groups = "drop")
+
+pf_numbers <- pf_freq_ls %>% 
+  select(Number, sum_pos) %>%
+  mutate(is_positive = if_else(sum_pos > 0,1,0)) %>%
+  group_by(is_positive) %>%
+  summarise(n_app = n(), .groups = "drop")
+
+career_numbers <- career_freq_ls %>% 
+  select(Number, sum_pos) %>%
+  mutate(is_positive = if_else(sum_pos > 0, 1, 0)) %>%
+  group_by(is_positive) %>%
+  summarise(n_app = n(), .groups = "drop")
+
+
+# EDA overall success rate
+spark_success <- sparkabs_freq_ls %>% 
+  group_by(IsFundable) %>%
+  summarise(n_app= n(), .groups = "drop")
+
+pf_success <- pf_freq_ls %>% 
+  group_by(IsApproved) %>%
+  summarise(n_app = n(), .groups = "drop")
+
+career_success <- career_freq_ls %>% 
+  group_by(IsApproved) %>%
+  summarise(n_app = n(), .groups = "drop")
+
+## -----------------------------------------------
+## analyze specific words
+## -----------------------------------------------
+
+## ----plot specific words ----
+sparkabs_plot <-
+  plot_positivewords(freq_word = sparkabs_freq_ls, 
+                     pos_words= pos_words)
+pf_plot <- plot_positivewords(freq_word = pf_freq_ls,
+                              pos_words = pos_words)
+career_plot <-
+  plot_positivewords(freq_word = career_freq_ls,
+                     pos_words = pos_words)
+```
+
+```{r all calculations part 2, cache = FALSE, echo = FALSE, results = 'hide'}
+#analyze the effects of gender on language
+#--------------------------------------
+## analysis: gender on language
+#--------------------------------------
+# Analysis of the whether gender has an effect on the use of words as through..
+# .. binary variable for the presence of at least one positive word
+# .. .. using linear probability models
+# .. .. using logistic regression models
+# .. the count of distinct positive words using Poisson regression
+# .. .. quasipoisson and negative binomial regression
+
+
+# spark abstracts
+# ---------------
+sparkabs_reg_ls <- sparkabs_freq_ls %>%
+  analyze_gender()
+# pf abstracts
+# ---------------
+pf_reg_ls <- analyze_gender(dat = pf_freq_ls)
+
+# career abstracts
+# ---------------
+career_reg_ls <- analyze_gender(dat =  career_freq_ls)
+
+```
+
+
+This online supplement shows some additional Figures and Tables, that were not included in the main manuscript but are nevertheless relevant results. Figure \@ref(fig:fig-distribution-number-poswords-inst) shows the distribution of the positive word count per proposal depending on the institution type and funding scheme. 
+Figure \@ref(fig:fig-specific-words) then show the share of proposals with at least one occurence of the specific positive word in the texts depending on the applicant's gender and funding scheme. 
+
+Then, Table \@ref(tab:tab-gender-linear-stratify) shows the results of the multivariate linear probability model adjusted for age (in years), the institution type and the length of the texts. Evidence for a gender effect on the presence of a positive word cannot be found in any of the models for the different funding scheme. Unsurprisingly, the length of the text increases the chance of a positive word. Additionally, we find evidence for an effect of the institution type in proposals to Projects: compared to researchers from cantonal universities, researchers affiliated to the ETH Domain have a higher probability of using at least one positive word when describing their research projects. 
+
+Table \@ref(tab:tab-gender-binary-stratify) shows the odds ratios from the logistic regression, modelling the binary outcome “at least one positive word”, for all three data sources. A gender OR (male vs. female) larger than 1 suggests that male researchers are more likely to use at least one positive word compared to female researchers (used as the reference). We again do not see any evidence for gender differences in language usage in any of the funding schemes. The results are indeed very similar to the linear probability model which is reassuring.  
+
+```{r fig-distribution-number-poswords-inst, fig.height = 8, fig.width = 6, fig.cap = "Distribution of the number of positive words by Institution Type and funding scheme.", message = FALSE, warning = FALSE}
+
+p_pf <- pf_freq_ls %>% 
+  group_by(ResearchInstitutionType) %>% 
+  count(sum_pos) %>% 
+  mutate(sum_pos = case_when(sum_pos >= 7 ~ "7+",
+                             TRUE ~ as.character(sum_pos)),
+         sum_pos = factor(sum_pos, levels = c(0:6, "7+"))) %>% 
+  group_by(ResearchInstitutionType, sum_pos) %>% 
+  summarise(n = sum(n)) %>% 
+  mutate(perc = n/sum(n)) %>% 
+  ggplot(aes(x = sum_pos, y = perc, color = ResearchInstitutionType,
+             fill = ResearchInstitutionType)) +
+  geom_col(position = position_dodge(), color = "white") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
+                     limits=c(0, .55)) +
+  scale_fill_manual(
+    values = get_datastory_scheme(),
+    name = "") +
+  get_datastory_theme() + 
+  theme(axis.title.x = element_blank(), 
+        axis.title.y = element_blank()) +
+  ggtitle(paste0("Projects")) 
+
+p_careers <- career_freq_ls %>% 
+  group_by(ResearchInstitutionType) %>% 
+  count(sum_pos) %>% 
+  mutate(sum_pos = case_when(sum_pos >= 7 ~ "7+",
+                             TRUE ~ as.character(sum_pos)),
+         sum_pos = factor(sum_pos, levels = c(0:6, "7+")))  %>% 
+  group_by(ResearchInstitutionType, sum_pos) %>% 
+  summarise(n = sum(n)) %>% 
+  mutate(perc = n/sum(n)) %>% 
+  ggplot(aes(x = sum_pos, y = perc, color = ResearchInstitutionType,
+             fill = ResearchInstitutionType)) +
+  geom_col(position = position_dodge(), color = "white") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
+                     limits=c(0, .55)) +
+  scale_fill_manual(
+    values = get_datastory_scheme(),
+    name = "") +
+  get_datastory_theme() + 
+  theme(axis.title.x = element_blank(), 
+        axis.title.y = element_blank()) +
+  ggtitle(paste0("Careers")) 
+
+p_spark <- sparkabs_freq_ls %>% 
+  group_by(ResearchInstitutionType) %>% 
+  count(sum_pos) %>% 
+  mutate(sum_pos = case_when(sum_pos >= 7 ~ "7+",
+                             TRUE ~ as.character(sum_pos)),
+         sum_pos = factor(sum_pos, levels = c(0:6, "7+"))) %>% 
+  group_by(ResearchInstitutionType, sum_pos) %>% 
+  summarise(n = sum(n)) %>% 
+  mutate(perc = n/sum(n)) %>% 
+  ggplot(aes(x = sum_pos, y = perc, color = ResearchInstitutionType,
+             fill = ResearchInstitutionType)) +
+  geom_col(position = position_dodge(), color = "white") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
+                     limits=c(0, .55)) +
+  scale_fill_manual(
+    values = get_datastory_scheme(),
+    name = "") +
+  get_datastory_theme() + 
+  theme(axis.title.x = element_blank(), 
+        axis.title.y = element_blank()) +
+  ggtitle(paste0("Spark")) 
+
+p <- cowplot::plot_grid(p_pf + theme(legend.position = "none"), 
+                        p_careers + theme(legend.position = "none"),
+                        p_spark + theme(legend.position = "none"),
+                        ncol = 1)
+
+grobs <- ggplotGrob(p_pf)$grobs
+legend <-
+  grobs[[which(sapply(grobs, function(x)
+    x$name) == "guide-box")]]
+
+plot_grid(p,
+          legend,
+          ncol = 1,
+          rel_heights = c(1, 0.05))
+```
+
+```{r fig-specific-words, fig.height = 8, fig.width = 6, fig.cap = "Gender differences in positive language usage in the life sciences, per fundingi scheme.", message = FALSE, warning = FALSE}
+
+# Removed from caption: In analysis of top ten most used words in each research area, no significant gender difference was found in LS. In MINT, male applicants used *robust*, *prominent*, and *remarkable* while female applicants used *innovative* significantly more. In SSH, male applicants used *unique*, *prominent* and *innovative* significantly more.
+
+#Note: Edit the caption according to significant results for analyze_specificwords in the code chunk: r specific words
+p <- cowplot::plot_grid(pf_plot + 
+                          labs(title = "Projects") +
+                          theme(legend.position = "none"), 
+                        career_plot + 
+                          labs(title = "Careers") +
+                          theme(legend.position = "none"),
+                        sparkabs_plot +
+                          labs(title = "Spark") +
+                          theme(legend.position = "none"),
+                        ncol = 1)
+                    
+grobs <- ggplotGrob(pf_plot)$grobs
+legend <-
+  grobs[[which(sapply(grobs, function(x)
+    x$name) == "guide-box")]]
+
+plot_grid(p,
+          legend,
+          ncol = 1,
+          rel_heights = c(1, 0.05))
+```
+
+
+```{r tab-gender-linear-stratify, message = FALSE, warning = FALSE, cache = F}
+# list of covariates to be reported
+covariate_list <- names(coefficients(sparkabs_reg_ls$linear))[-1]
+# regression results 
+reg_gender_linear_ls <- list(pf = pf_reg_ls$linear, 
+                             career = career_reg_ls$linear ,
+                             spark = sparkabs_reg_ls$linear)
+
+tabulate_lm_ci <- function(m, digits = 3){
+  e <- summary(m)$coef[, "Estimate"]
+  sd <- summary(m)$coef[, "Std. Error"]
+  paste0(round(e, digits), " (", round(e - 1.96*sd, digits),
+         "--", round(e + 1.96*sd, digits), ")") %>% 
+    return()
+}
+
+ls_column_linear <- lapply(reg_gender_linear_ls,
+                           FUN = tabulate_lm_ci) %>% unlist()
+
+var_column <- rep(c("Intercept", "gender - male", "age (years)",
+                    "inst. type - ETH Domain", 
+                    "inst. type - UAS and Other",
+                    "text length (per 100 words)"), 3)
+
+FI_column <- c(
+  rep(paste0("Projects: ", format(nrow(pf_reg_ls$linear$model), big.mark = "'"),
+             " observations"), 6),
+  rep(paste0("Careers: ", format(nrow(career_reg_ls$linear$model),
+                                 big.mark = "'"), " observations"), 6), 
+  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$linear$model),
+                               big.mark = "'"), " observations"), 6))
+
+tab_linear <- data.frame(FI_column,
+                         var_column, ls_column_linear,
+                         stringsAsFactors = FALSE)
+row.names(tab_linear) <- NULL
+
+tab_linear_print <- tab_linear %>% 
+  as_grouped_data(groups = "FI_column") %>%
+  as_flextable(hide_grouplabel = TRUE,
+               col_keys = c("var_column",
+                            "ls_column_linear")) %>%
+  colformat_md(j = c(2)) %>%
+  set_header_labels(var_column = " ",
+                    ls_column_linear = "Coefficient Estimate (95% CI)") %>%
+  bold(bold = TRUE, part = c("header")) %>%
+  set_caption(caption = "Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from zero.")%>%
+  width(width = 3) %>% 
+  hline(i = c(7, 14)) %>% 
+  bold(i = c(1, 8, 15))
+
+tab_linear_print 
+```
+
+```{r tab-gender-binary-stratify, message = FALSE, warning = FALSE, cache = F, results = "asis"}
+# list of covariates to be reported
+covariate_list <- names(coefficients(sparkabs_reg_ls$log))[-1]
+# regression results 
+reg_gender_binary_ls <- list(pf = pf_reg_ls$log, 
+                             career = career_reg_ls$log ,
+                             spark = sparkabs_reg_ls$log)
+
+tabulate_ci <- function(m, digits = 3){
+  v <- cbind(exp(m$coefficients), exp(confint(m))) 
+  paste0(round(v[ ,1], digits), " (", round(v[ , 2], digits), "--",
+         round(v[ ,3], digits), ")") %>% 
+    return()
+}
+
+ls_column <- lapply(reg_gender_binary_ls,
+                    FUN = tabulate_ci) %>% unlist()
+
+var_column <- rep(c("Intercept", "gender - male", "age (years)",
+                    "inst. type - ETH Domain", 
+                    "inst. type - UAS and Other",
+                    "text length (per 100 words)"), 3)
+
+FI_column <- c(
+  rep(paste0("Projects: ", format(nrow(pf_reg_ls$log$model), big.mark = "'"),
+             " observations"), 6),
+  rep(paste0("Careers: ", format(nrow(career_reg_ls$log$model), big.mark = "'"),
+             " observations"), 6), 
+  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$log$model), big.mark = "'"),
+             " observations"), 6))
+
+tab_binary <- data.frame(FI_column,
+                         var_column, ls_column,
+                         stringsAsFactors = FALSE)
+row.names(tab_binary) <- NULL
+
+tab_binary_print <- tab_binary %>% 
+  as_grouped_data(groups = "FI_column") %>%
+  as_flextable(hide_grouplabel = TRUE,
+               col_keys = c("var_column",
+                            "ls_column"))%>%
+  colformat_md(j = c(2)) %>%
+  set_header_labels(var_column = " ",
+                    ls_column = "OR Estimate (95% CI)") %>%
+  bold(bold = TRUE, part = c("header")) %>%
+  set_caption(caption = "Odds ratios (OR) of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. The bold coefficient estimates are significantly different from one.") %>%
+  width(width = 3) %>% 
+  hline(i = c(7, 14)) %>% 
+  bold(i = c(1, 8, 15))
+
+tab_binary_print 
+```
