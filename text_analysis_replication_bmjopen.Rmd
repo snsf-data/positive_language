@@ -516,7 +516,7 @@ The three funding schemes included in this study are:
 `r pf_numbers %>% mutate(perc = n_app/sum(n_app)) %>% filter(is_positive == 1) %>% pull(perc) %>% round(2) *100`% of which contain at least one of the positive words in their title or abstract. 
 
 **Careers** (Ambizione, Excellenza, Professorships): These funding schemes are meant to support early-career researchers to be able to lead independent projects. The target researchers are a couple years past the completion of their PhDs, and are aiming for, but do not yet have, permanent tenure-track professorships. The track record of the applicants is very important for the success of their proposals. 
-<!-- 4,648  -->
+<!-- 4,648  --> 
 `r career_freq_ls %>% nrow() %>% format(big.mark = "'")`
 proposals from Careers are included in this study, 
 <!-- 55.1 -->
