@@ -1,25 +1,26 @@
 ---
-title: "Online reproducible supplement"
+title: "Supplement" #"Online reproducible supplement"
 subtitle: "Cross-sectional analysis of self-promotional language in texts of grant proposals across gender"
 header-includes:
    - \usepackage{dcolumn}
    - \usepackage{booktabs}
    - \usepackage{makecell}
 output:
-   bookdown::html_document2:
+  bookdown::html_document2:
     fig_cap: TRUE
     theme: paper
     highlight: null
     mathjax: null
     self_contained: true
-    code_folding: hide
+    # code_folding: hide
 urlcolor: #6684c1
 link-citations: true
 ---
 
 ```{r init, include=FALSE, warning=FALSE}
 # kableExtra for kable-tables
-options(kableExtra.latex.load_packages = FALSE )
+options(kableExtra.latex.load_packages = FALSE, 
+        echo = FALSE)
 library(kableExtra)
 
 library(snf.datastory)
@@ -296,7 +297,7 @@ Then, Table \@ref(tab:tab-gender-linear-stratify) shows the results of the multi
 
 <!-- Table \@ref(tab:tab-gender-binary-stratify) shows the odds ratios from the logistic regression, modelling the binary outcome “at least one positive word”, for all three data sources. A gender OR (male vs. female) larger than 1 suggests that male researchers are more likely to use at least one positive word compared to female researchers (used as the reference). We again do not see any evidence for gender differences in language usage in any of the funding schemes. The results are indeed very similar to the linear probability model which is reassuring.   -->
 
-```{r fig-distribution-number-poswords-inst, fig.height = 8, fig.width = 6, fig.cap = "Distribution of the number of positive words by Institution Type and funding scheme.", message = FALSE, warning = FALSE}
+```{r fig-distribution-number-poswords-inst, fig.height = 8, fig.width = 6, fig.cap = "Distribution of the number of positive words by Institution Type and funding scheme.", message = FALSE, warning = FALSE, echo=FALSE}
 
 p_pf <- pf_freq_ls %>% 
   group_by(ResearchInstitutionType) %>% 
@@ -362,7 +363,7 @@ p_spark <- sparkabs_freq_ls %>%
   get_datastory_theme() + 
   theme(axis.title.x = element_blank(), 
         axis.title.y = element_blank()) +
-  ggtitle(paste0("Spark")) 
+  ggtitle(paste0("Pilot")) 
 
 p <- cowplot::plot_grid(p_pf + theme(legend.position = "none"), 
                         p_careers + theme(legend.position = "none"),
@@ -380,7 +381,7 @@ plot_grid(p,
           rel_heights = c(1, 0.05))
 ```
 
-```{r fig-specific-words, fig.height = 8, fig.width = 6, fig.cap = "Gender differences in positive language usage in the life sciences, per fundingi scheme.", message = FALSE, warning = FALSE}
+```{r fig-specific-words, fig.height = 8, fig.width = 6, fig.cap = "Gender differences in positive language usage in the life sciences, per fundingi scheme.", message = FALSE, warning = FALSE, echo = FALSE}
 
 # Removed from caption: In analysis of top ten most used words in each research area, no significant gender difference was found in LS. In MINT, male applicants used *robust*, *prominent*, and *remarkable* while female applicants used *innovative* significantly more. In SSH, male applicants used *unique*, *prominent* and *innovative* significantly more.
 
@@ -392,7 +393,7 @@ p <- cowplot::plot_grid(pf_plot +
                           labs(title = "Careers") +
                           theme(legend.position = "none"),
                         sparkabs_plot +
-                          labs(title = "Spark") +
+                          labs(title = "Pilot") +
                           theme(legend.position = "none"),
                         ncol = 1)
                     
@@ -408,7 +409,7 @@ plot_grid(p,
 ```
 
 
-```{r tab-gender-linear-stratify, message = FALSE, warning = FALSE, cache = F}
+```{r tab-gender-linear-stratify, message = FALSE, warning = FALSE, cache = F, echo=FALSE}
 # list of covariates to be reported
 covariate_list <- names(coefficients(sparkabs_reg_ls$linear))[-1]
 # regression results 
@@ -437,7 +438,7 @@ FI_column <- c(
              " observations"), 6),
   rep(paste0("Careers: ", format(nrow(career_reg_ls$linear$model),
                                  big.mark = "'"), " observations"), 6), 
-  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$linear$model),
+  rep(paste0("Pilot: ", format(nrow(sparkabs_reg_ls$linear$model),
                                big.mark = "'"), " observations"), 6))
 
 tab_linear <- data.frame(FI_column,
@@ -462,7 +463,8 @@ tab_linear_print <- tab_linear %>%
 tab_linear_print 
 ```
 
-```{r tab-gender-binary-stratify, message = FALSE, warning = FALSE, cache = F, results = "asis"}
+\pagebreak
+```{r tab-gender-binary-stratify, message = FALSE, warning = FALSE, cache = F, results = "asis", echo = FALSE}
 # list of covariates to be reported
 covariate_list <- names(coefficients(sparkabs_reg_ls$log))[-1]
 # regression results 

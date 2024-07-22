@@ -35,9 +35,9 @@ options(tinytex.clean = T)
 options(kableExtra.latex.load_packages = FALSE )
 library(kableExtra)
 
-library(snf.datastory)
 # devtools::install_github("snsf-data/snf.datastory")
 # or renv::install("snsf-data/snf.datastory")
+library(snf.datastory)
 
 # Use here("...") with paths relative to the project root
 # to address files
@@ -55,13 +55,14 @@ library(here)
 # conflict_prefer("group_rows", "kableExtra")
 # More libraries
 library(cowplot)
-library(texreg)
+# library(texreg)
 library(broom)
 library(dplyr)
-library(tm)
+# library(tm)
 # library(cld3)
-library(sandwich)
-library(msm)
+# library(sandwich)
+# library(msm)
+library(showtext)
 library(tidyr)
 library(ggpubr)
 library(flextable)
@@ -499,11 +500,11 @@ tab_sum_pos <- pf_freq_ls %>%
 ```
 
 
-The data comes from research grant proposals submitted to the Swiss National Science Foundation (SNSF) in life sciences disciplines in the ten years between 2011 and 2020, and one shorter funding scheme. This study looks at the titles and abstracts from three different funding schemes and investigates whether any of the 25 positive words identified by @Vinkers2015 appear in these texts, and if so, how frequently. Only English-language proposals are considered, which means that 0.3% of the available Career proposals and 0.3% of the Project proposals had to be removed before processing.  
+The data comes from research grant proposals submitted to the Swiss National Science Foundation (SNSF) in life sciences disciplines in the ten years between 2011 and 2020, and one shorter funding scheme. This study looks at the titles and abstracts from three different funding schemes and investigates whether any of the 25 positive words identified by @Vinkers2015 appear in these texts, and if so, how frequently. Only English-language proposals are considered, which means that `r round(as.numeric(str_remove(tab_fi$n_perc_car, "'"))*1.003 -as.numeric(str_remove(tab_fi$n_perc_car, "'")))` (0.3\% of `r round(as.numeric(str_remove(tab_fi$n_perc_car, "'"))*1.003)`) of the available Career proposals and `r round(as.numeric(str_remove(tab_fi$n_perc, "'"))*1.003 - as.numeric(str_remove(tab_fi$n_perc, "'")))` (0.3\% of `r round(as.numeric(str_remove(tab_fi$n_perc, "'"))*1.003)`)  of the Project proposals had to be removed before processing.  
 
 As part of the proposal submission process, applicants identify their own gender, so that the gender of each applicant is known with certainty. For the purposes of this study, we only consider the gender of the corresponding applicant on each proposal, although one of the three funding schemes included (Projects) can also involve multiple co-applicants.
 
-We investigate whether there is an association between the gender and the use of positive words in each funding scheme. Grant proposals to the SNSF are classified into three research areas: 1) Social Sciences and Humanities, 2) Mathematics, Natural- and Engineering Sciences, and 3) Life Sciences. Because the list of positive terms considered was created for biomedical texts, and we do not knowit is uncertain how well this list generalizes to other domains, we include only life sciences proposals in this analysis. 
+We investigate whether there is an association between the gender and the use of positive words in each funding scheme. Grant proposals to the SNSF are classified into three research areas: 1) Social Sciences and Humanities, 2) Mathematics, Natural- and Engineering Sciences, and 3) Life Sciences. Because the list of positive terms considered was created for biomedical texts, and it is uncertain how well this list generalizes to other domains, we include only life sciences proposals in this analysis. 
 
 Researchers apply from three types of research institutions: Cantonal universities are the 12 large public research universities in Switzerland; the ETH-Domain consists of the Swiss Federal Institutes of Technology (two universities - ETHZ and EPFL - and four research institutions); and the Universities of Applied Sciences (UAS) and other research institutes focused on practice-oriented qualifications.
 
@@ -695,7 +696,7 @@ p_spark <- sparkabs_freq_ls %>%
   theme(panel.grid.major.x = element_blank(),
         panel.grid.major.y = element_line(linetype = "dashed"),
         panel.grid.minor.y = element_line(linetype = "dashed")) +
-  ggtitle(paste0("Spark")) 
+  ggtitle(paste0("Pilot")) 
 
 p <- cowplot::plot_grid(p_pf + theme(legend.position = "none"), 
                         p_careers + theme(legend.position = "none"),
@@ -931,7 +932,7 @@ fig_spark_abs <- spark_pred %>%
                   position = position_dodge(width = 0.5)) +
   ylab("Estimated number of positive words") +
   xlab("Applicant gender") + 
-  ggtitle("Spark") +
+  ggtitle("Pilot") +
   ylim(.8, 2) +
   theme_minimal() + 
   theme(axis.title.y = element_blank(),
