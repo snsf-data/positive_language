@@ -9,7 +9,7 @@ output:
     fig_caption: true
     keep_md: true
 urlcolor: #6684c1
-bibliography: bib_bmjopen.bib
+bibliography: bib_file.bib
 link-citations: true
 ---
 
