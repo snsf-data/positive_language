@@ -19,8 +19,8 @@ link-citations: true
 
 ```{r init, include=FALSE, warning=FALSE}
 # kableExtra for kable-tables
-options(kableExtra.latex.load_packages = FALSE, 
-        echo = FALSE)
+# options(kableExtra.latex.load_packages = FALSE, 
+#         echo = FALSE)
 library(kableExtra)
 
 library(snf.datastory)
@@ -55,12 +55,9 @@ library(ggpubr)
 library(flextable)
 library(ftExtra)
 library(stringr)
-
-
+library(lmtest)
+library(performance)
 library(readxl)
-# windowsFonts("Source Sans" = windowsFont("Source Sans Pro Regular"))
-# change this to false if desired output is pdf
-is_word = TRUE
 ```
 
 ```{r load-ls-data, cache = FALSE, echo = FALSE, results = 'hide'}
@@ -69,6 +66,7 @@ is_word = TRUE
 url <- "https://zenodo.org/record/6676562/files/positive_words_frequencies.xlsx"
 destfile <- "positive_words_frequencies.xlsx"
 curl::curl_download(url, destfile)
+
 
 career_freq_ls <-  read_xlsx(destfile, sheet = "career") %>% 
   mutate(Number = 1:n()) %>% 
@@ -290,12 +288,11 @@ career_reg_ls <- analyze_gender(dat =  career_freq_ls)
 ```
 
 
-This online supplement shows some additional Figures and Tables, that were not included in the main manuscript but are nevertheless relevant results. Figure \@ref(fig:fig-distribution-number-poswords-inst) shows the distribution of the positive word count per proposal depending on the institution type and funding scheme. 
+This online supplement shows some additional Figures and Tables, that were not included in the main manuscript but are nevertheless relevant results. 
+
+# Extra Figures
+Figure \@ref(fig:fig-distribution-number-poswords-inst) shows the distribution of the positive word count per proposal depending on the institution type and funding scheme. 
 Figure \@ref(fig:fig-specific-words) then show the share of proposals with at least one occurence of the specific positive word in the texts depending on the applicant's gender and funding scheme. 
-
-Then, Table \@ref(tab:tab-gender-linear-stratify) shows the results of the multivariate linear probability model adjusted for age (in years), the institution type and the length of the texts. Evidence for a gender effect on the presence of a positive word cannot be found in any of the models for the different funding scheme. Unsurprisingly, the length of the text increases the chance of a positive word. Additionally, we find evidence for an effect of the institution type in proposals to Projects: compared to researchers from cantonal universities, researchers affiliated to the ETH Domain have a higher probability of using at least one positive word when describing their research projects. 
-
-<!-- Table \@ref(tab:tab-gender-binary-stratify) shows the odds ratios from the logistic regression, modelling the binary outcome “at least one positive word”, for all three data sources. A gender OR (male vs. female) larger than 1 suggests that male researchers are more likely to use at least one positive word compared to female researchers (used as the reference). We again do not see any evidence for gender differences in language usage in any of the funding schemes. The results are indeed very similar to the linear probability model which is reassuring.   -->
 
 ```{r fig-distribution-number-poswords-inst, fig.height = 8, fig.width = 6, fig.cap = "Distribution of the number of positive words by Institution Type and funding scheme.", message = FALSE, warning = FALSE, echo=FALSE}
 
@@ -408,8 +405,12 @@ plot_grid(p,
           rel_heights = c(1, 0.05))
 ```
 
+# Linear probability model results
+The Table below shows the results of the multivariate linear probability model adjusted for age (in years), the institution type and the length of the texts. Evidence for a gender effect on the presence of a positive word cannot be found in any of the models for the different funding scheme. Unsurprisingly, the length of the text increases the chance of a positive word. Additionally, we find evidence for an effect of the institution type in proposals to Projects: compared to researchers from cantonal universities, researchers affiliated to the ETH Domain have a higher probability of using at least one positive word when describing their research projects. 
 
-```{r tab-gender-linear-stratify, message = FALSE, warning = FALSE, cache = F, echo=FALSE}
+**TAB S1: _Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is Cantonal University._**
+```{r tab-gender-linear-stratify, message = FALSE, warning = FALSE, cache = F, echo=FALSE }
+
 # list of covariates to be reported
 covariate_list <- names(coefficients(sparkabs_reg_ls$linear))[-1]
 # regression results 
@@ -455,32 +456,61 @@ tab_linear_print <- tab_linear %>%
   set_header_labels(var_column = " ",
                     ls_column_linear = "Coefficient Estimate (95% CI)") %>%
   bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'. ")%>%
+  # set_caption(caption = "Multivariate linear probability model of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is Cantonal University.")%>%
   width(width = 3) %>% 
   hline(i = c(7, 14)) %>% 
   bold(i = c(1, 8, 15))
 
-tab_linear_print 
+tab_linear_print
 ```
 
-\pagebreak
-```{r tab-gender-binary-stratify, message = FALSE, warning = FALSE, cache = F, results = "asis", echo = FALSE}
-# list of covariates to be reported
-covariate_list <- names(coefficients(sparkabs_reg_ls$log))[-1]
-# regression results 
-reg_gender_binary_ls <- list(pf = pf_reg_ls$log, 
-                             career = career_reg_ls$log ,
-                             spark = sparkabs_reg_ls$log)
+# Model comparisons and tests
 
+**Poisson and negative binomial (NB)** models are nested, since the Poisson model is a special case of the NB. Hence we can use a likelihood ratio test to compare the two model specifications. Additionally, we performed a check for overdispersion, using the {performance} R-package.
+```{r, echo = TRUE}
+# For Project funding
+lrtest(pf_reg_ls$count, pf_reg_ls$nbcount) 
+check_overdispersion(pf_reg_ls$count)
+
+# For Career funding
+lrtest(career_reg_ls$count, career_reg_ls$nbcount) 
+check_overdispersion(career_reg_ls$count)
+
+# For the pilot
+lrtest(sparkabs_reg_ls$count, sparkabs_reg_ls$nbcount) 
+check_overdispersion(sparkabs_reg_ls$count)
+```
+
+The model performance of the models with **logit and probit** specification was compared using likelihood ratio test, using the function `test_performance()`. No evidence for a difference between the models' performance was found.
+
+```{r, echo = TRUE}
+# For Project funding
+test_performance(pf_reg_ls$log, pf_reg_ls$prob)
+
+# For Career funding
+test_performance(career_reg_ls$log, career_reg_ls$prob)
+
+# For the pilot
+test_performance(sparkabs_reg_ls$log, sparkabs_reg_ls$prob)
+```
+
+
+# Poisson regression model results 
+**TAB S2: _Summary of the negative binomial model using rate ratios (RR), with 95% confidence intervals (CI). The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'._**
+```{r Poisson}
 tabulate_ci <- function(m, digits = 3){
   v <- cbind(exp(m$coefficients), exp(confint(m))) 
   paste0(round(v[ ,1], digits), " (", round(v[ , 2], digits), "-",
          round(v[ ,3], digits), ")") %>% 
     return()
 }
+# regression results for reach research area
+reg_gender_count_ls <- list(pf = pf_reg_ls$count, 
+                            career = career_reg_ls$count,
+                            spark = sparkabs_reg_ls$count)
 
-ls_column <- lapply(reg_gender_binary_ls,
-                    FUN = tabulate_ci) %>% unlist()
+ls_column_count <- lapply(reg_gender_count_ls,
+                          FUN = tabulate_ci) %>% unlist()
 
 var_column <- rep(c("Intercept", "gender - male", "age (years)",
                     "inst. type - ETH Domain", 
@@ -488,31 +518,32 @@ var_column <- rep(c("Intercept", "gender - male", "age (years)",
                     "text length (per 100 words)"), 3)
 
 FI_column <- c(
-  rep(paste0("Projects: ", format(nrow(pf_reg_ls$log$model), big.mark = "'"),
+  rep(paste0("Projects: ", format(nrow(pf_reg_ls$count$model), big.mark = "'"),
              " observations"), 6),
-  rep(paste0("Careers: ", format(nrow(career_reg_ls$log$model), big.mark = "'"),
-             " observations"), 6), 
-  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$log$model), big.mark = "'"),
-             " observations"), 6))
+  rep(paste0("Careers: ", format(nrow(career_reg_ls$count$model),
+                                 big.mark = "'"), " observations"), 6), 
+  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$count$model),
+                               big.mark = "'"), " observations"), 6))
 
-tab_binary <- data.frame(FI_column,
-                         var_column, ls_column,
-                         stringsAsFactors = FALSE)
-row.names(tab_binary) <- NULL
+tab_count <- data.frame(FI_column, var_column, ls_column_count,
+                        stringsAsFactors = FALSE)
+row.names(tab_count) <- NULL
 
-tab_binary_print <- tab_binary %>% 
+
+tab_count_print <- tab_count %>% 
   as_grouped_data(groups = "FI_column") %>%
   as_flextable(hide_grouplabel = TRUE,
                col_keys = c("var_column",
-                            "ls_column"))%>%
+                            "ls_column_count")) %>%
   colformat_md(j = c(2)) %>%
   set_header_labels(var_column = " ",
-                    ls_column = "OR Estimate (95% CI)") %>%
+                    ls_column_count = "RR Estimate (95% CI)") %>%
   bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Odds ratios (OR) of applicants using a positive term at least once in their texts. The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'.") %>%
   width(width = 3) %>% 
   hline(i = c(7, 14)) %>% 
   bold(i = c(1, 8, 15))
 
-# tab_binary_print 
+tab_count_print
 ```
+
+

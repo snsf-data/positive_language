@@ -286,6 +286,7 @@ career_plot <-
 # .. binary variable for the presence of at least one positive word
 # .. .. using linear probability models
 # .. .. using logistic regression models
+# .. .. using probit regression models
 # .. the count of distinct positive words using Poisson regression
 # .. .. quasipoisson and negative binomial regression
 
@@ -340,6 +341,7 @@ Bias against female grant applicants has been observed across research funding a
 It is well-established that scientists often over-inflate the importance of their work in order to get published or funded (@Ioannidis2014, @Chiu2017). There is evidence that men use more self-promotional language than women when describing their own work histories (@Reuben2014). In particular, female authors of medical and life sciences articles were previously observed to use strongly positive language less frequently to describe their research than their male counterparts (@Lerchenmueller).  @Lerchenmueller used a list of 25 positive words established by @Vinkers2015 who selected them after manual analysis of biomedical texts from PubMed. @Vinkers2015 observed a significant increase in the use of these words across all PubMed literature over a 40-year period, and concluded that this is likely due to the positive-outcome bias in scientific publishing - that only research with the most unprecedented positive results will be published. This list was developed specifically for studying biomedical texts, and preliminary analyses have suggested that the usage of these words differs somewhat in other research areas.  
 
 The current study builds on this study by @Lerchenmueller, replicating and extending their analyses to understand if their findings can also be observed in the context of research grant proposals. We analyse proposals submitted to three different funding schemes at the Swiss National Science Foundation, where the importance of the track record of the applicant varies considerably. We hypothesize that whether an applicant must present themselves as an established and successful researcher, as opposed to just promoting a single project idea, may influence how they describe their research. Since writing styles can differ substantially between academic disciplines (@Hyland2006) and the list of positive words was developed for biomedical texts, we will limit our analysis to grant proposals coming from the broad domain of life sciences. 
+
 This study provides insight into the use of self-promotional language in research grant proposals. The results should be of broad interest to the international scientific community, as Swiss scientific research is very competitive internationally. In fact, over half of the Swiss-based researchers included in this study originated from countries outside Switzerland (based on their current citizenship). This analysis is also important as a replication attempt of a notable result in the literature. 
 
 # Methods
@@ -803,14 +805,14 @@ row.names(tab_binary) <- NULL
 
 ```
 
-In the Poisson regression summarized in the second column of Table \@ref(tab:tab-gender-binary-count-ls), the outcome “positive words” is treated as a count variable rather than the binary presence/absence. Here we provide the rate ratios of the use of positive words (the exponential of the regression coefficient). These incident rate ratios essentially tell us how many more (or fewer) positive words are expected, compared to a reference for factor and binary variables, or for a unit change of the continuous explanatory variable. The interpretation of rate ratios for Poisson regression is closely related to that of odds ratios for logistic regression. No evidence for a gender effect on the count of positive words is found in any of the Poisson regression models for the different funding schemes. In Projects and Spark, younger researchers tend to use more positive words than their older peers. Unsurprisingly, more positive words can be found in longer texts. In Projects, researchers from the ETH Domain have a higher positive word count compared to cantonal universities, while in Careers, researchers affiliated in UAS and others tend to describe their research less positively than their peers from the cantonal universities.  
+In the negative binomial regression summarized in the second column of Table \@ref(tab:tab-gender-binary-count-ls), the outcome “positive words” is treated as a count variable rather than the binary presence/absence. Here we provide the rate ratios of the use of positive words (the exponential of the regression coefficient). These incident rate ratios essentially tell us how many more (or fewer) positive words are expected, compared to a reference for factor and binary variables, or for a unit change of the continuous explanatory variable. The interpretation of rate ratios for negative binomial regression is closely related to that of odds ratios for logistic regression. No evidence for a gender effect on the count of positive words is found in any of the negative binomial regression models for the different funding schemes. In Projects and Spark, younger researchers tend to use more positive words than their older peers. Unsurprisingly, more positive words can be found in longer texts. In Projects, researchers from the ETH Domain have a higher positive word count compared to cantonal universities, while in Careers, researchers affiliated in UAS and others tend to describe their research less positively than their peers from the cantonal universities.  
 
 
 ```{r tab-gender-count-ls, message = FALSE, warning = FALSE, cache = F, results = "asis"}
 # regression results for reach research area
-reg_gender_count_ls <- list(pf = pf_reg_ls$count, 
-                            career = career_reg_ls$count,
-                            spark = sparkabs_reg_ls$count)
+reg_gender_count_ls <- list(pf = pf_reg_ls$nbcount, 
+                            career = career_reg_ls$nbcount,
+                            spark = sparkabs_reg_ls$nbcount)
 
 ls_column_count <- lapply(reg_gender_count_ls,
                           FUN = tabulate_ci) %>% unlist()
@@ -821,11 +823,11 @@ var_column <- rep(c("Intercept", "gender - male", "age (years)",
                     "text length (per 100 words)"), 3)
 
 FI_column <- c(
-  rep(paste0("Projects: ", format(nrow(pf_reg_ls$count$model), big.mark = "'"),
+  rep(paste0("Projects: ", format(nrow(pf_reg_ls$nbcount$model), big.mark = "'"),
              " observations"), 6),
-  rep(paste0("Careers: ", format(nrow(career_reg_ls$count$model),
+  rep(paste0("Careers: ", format(nrow(career_reg_ls$nbcount$model),
                                  big.mark = "'"), " observations"), 6), 
-  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$count$model),
+  rep(paste0("Spark: ", format(nrow(sparkabs_reg_ls$nbcount$model),
                                big.mark = "'"), " observations"), 6))
 
 tab_count <- data.frame(FI_column, var_column, ls_column_count,
@@ -847,10 +849,10 @@ tab_binary %>%
   set_header_labels(var_column = " ",
                     ls_column_count = "RR Estimate (95% CI)",
                     ls_column = "OR Estimate (95% CI)") %>%
-  add_header_row(values = c(" ", "Logistic model for presence", "Poisson model for the count"), 
+  add_header_row(values = c(" ", "Logistic model for presence", "Negative binomial model for the count"), 
                  colwidths = c(1, 1, 1), top = TRUE) %>% 
   bold(bold = TRUE, part = c("header")) %>%
-  set_caption(caption = "Summary of the logistic model using odds ratios (OR) and summary of the poisson model using rate ratios (RR), with 95% confidence intervals (CI). The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'.") %>%
+  set_caption(caption = "Summary of the logistic model using odds ratios (OR) and summary of the negative binomial model using rate ratios (RR), with 95% confidence intervals (CI). The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'.") %>%
   width(width = 3) %>% 
   hline(i = c(7, 14)) %>% 
   bold(i = c(1, 8, 15))
@@ -879,13 +881,13 @@ get_predict_words <- function(m, freq_data){
 }
 
 
-spark_pred <- get_predict_words(sparkabs_reg_ls$count,
+spark_pred <- get_predict_words(sparkabs_reg_ls$nbcount,
                                 freq_data = sparkabs_freq_ls)
 
-pf_pred <- get_predict_words(pf_reg_ls$count,
+pf_pred <- get_predict_words(pf_reg_ls$nbcount,
                              freq_data = pf_freq_ls)
 
-career_pred <- get_predict_words(career_reg_ls$count,
+career_pred <- get_predict_words(career_reg_ls$nbcount,
                              freq_data = career_freq_ls)
 
 
@@ -941,7 +943,7 @@ fig_spark_abs <- spark_pred %>%
         panel.grid.minor.y = element_line(linetype = "dashed")) 
 ```
 
-Figure \@ref(fig:fig-interaction-gender) illustrates the effects of gender on the language used in the Poisson regression models. The plots show the predicted number of positive words with 95% confidence error bars per gender, for an applicant of average age with a proposal of average text length from a cantonal university, for each funding scheme. 
+Figure \@ref(fig:fig-interaction-gender) illustrates the effects of gender on the language used in the negative binomial regression models. The plots show the predicted number of positive words with 95% confidence error bars per gender, for an applicant of average age with a proposal of average text length from a cantonal university, for each funding scheme. 
 
 We conclude that we cannot detect a difference in the use of positive words between male and female applicants in Life Sciences in any of the funding schemes. This is noteworthy, because the words used in our analysis were derived from PubMed abstracts (@Vinkers2015) and the original study (@Lerchenmueller) found a significant gender differences in their usage from clinical research and general life science articles indexed in PubMed. But that study only compared successful publications, while 
 this analysis <!-- our study -->
@@ -952,7 +954,7 @@ includes both funded and rejected proposals.
 <!-- The trend is different for SSH applicants in Spark. In Spark, female applicants are more likely to use higher count of positive words in their texts than male applicants, unlike in Projects. -->
 
 
-```{r fig-interaction-gender, fig.width = 6,fig.height = 3.5, fig.cap = "Illustration of the effects of gender on the language used in the Poisson regression models. The plots show the predicted number of positive words with 95% confidence error bars per gender, for an applicant of average age with a proposal of average text length, for each funding scheme. In all three funding schemes, male applicants used more positive words, but there was no significant difference as their confidence intervals overlap.", cache = FALSE, results = "asis", warning = FALSE, message = FALSE}
+```{r fig-interaction-gender, fig.width = 6,fig.height = 3.5, fig.cap = "Illustration of the effects of gender on the language used in the negative binomial  regression models. The plots show the predicted number of positive words with 95% confidence error bars per gender, for an applicant of average age with a proposal of average text length, for each funding scheme. In all three funding schemes, male applicants used more positive words, but there was no significant difference as their confidence intervals overlap.", cache = FALSE, results = "asis", warning = FALSE, message = FALSE}
 
 # Original caption: Illustration of the effects of gender and research area on the count of positive words for each funding instrument based on the fitted models. The plots are based on predicted number of positive used by applicants of each gender with average age and average abstract length of each instrument. In Spark, there is a small evidence that SSH female applicants used higher count of positive terms than their male peers, in constract to Projects, where male applicants are likelier to use higher count of positive words.
 

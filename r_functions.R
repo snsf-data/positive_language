@@ -78,6 +78,10 @@ analyze_gender <- function(dat) {
   logitfit <- glm(binary_formula,
                   family = binomial(link = "logit"),
                   data = dat)
+  
+  probitfit <- glm(binary_formula,
+                  family = binomial(link = "probit"),
+                  data = dat)
   #likelihood to use more positive words
   #-----------------------------
   poissonfit <-
@@ -98,6 +102,7 @@ analyze_gender <- function(dat) {
     list(
       linear = lpmfit,
       log = logitfit,
+      prob = probitfit,
       count = poissonfit,
       quasicount = quasipoissonfit,
       nbcount = nbfit
