@@ -497,7 +497,7 @@ test_performance(sparkabs_reg_ls$log, sparkabs_reg_ls$prob)
 
 # Poisson regression model results 
 **TAB S2: _Summary of the Poisson model using rate ratios (RR), with 95% confidence intervals (CI). The reference for the gender variable is female and for the institution (inst.) type factor variable is 'Cantonal University'._**
-```{r Poisson}
+```{r Poisson, echo = FALSE}
 tabulate_ci <- function(m, digits = 3){
   v <- cbind(exp(m$coefficients), exp(confint(m))) 
   paste0(round(v[ ,1], digits), " (", round(v[ , 2], digits), "-",
